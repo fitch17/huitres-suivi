@@ -651,7 +651,12 @@ function renderLots(){
     const initOrigine = l.origine ? l.origine.charAt(0).toUpperCase() : '?';
     const initLieu = l.lieuActuel ? l.lieuActuel.charAt(0).toUpperCase() : '?';
     const annee2 = String(l.annee).slice(-2);
-    const codeAffichage = l.numero + initOrigine + annee2 + '|' + initLieu;
+    // Détection fraction criblage : numéro se termine par -T, -C ou -Q
+    const fractionMatch = l.numero.match(/-(T|C|Q)$/i);
+    const fractionSuffix = fractionMatch ? '|' + fractionMatch[1].toUpperCase() : '';
+    // Numéro de base sans le suffixe fraction pour l'affichage
+    const numeroBase = l.numero.replace(/-(T|C|Q)$/i, '');
+    const codeAffichage = numeroBase + initOrigine + annee2 + '|' + initLieu + fractionSuffix;
     return `
     <div class="lot-card" onclick="openLot('${id}')">
       <div class="lot-header">
