@@ -253,14 +253,13 @@
     <!-- LOTS -->
     <div id="tab-lots" class="section">
       <div class="search-bar">
-        <input type="text" id="search" placeholder="Rechercher un lot…" onkeydown="if(event.key==='Enter')renderLots()">
-        <select id="filter-lieu" onchange="renderLots()">
+        <input type="text" id="search" placeholder="Rechercher un lot…" oninput="filterLots()">
+        <select id="filter-lieu" onchange="filterLots()">
           <option value="">Tous les lieux</option>
           <option value="Riantec">Riantec</option><option value="Carnac">Carnac</option><option value="Locmariaquer">Locmariaquer</option>
           <option value="Etel">Etel</option><option value="St Hélène">St Hélène</option><option value="Blaver">Blaver</option><option value="Golf">Golf</option>
         </select>
-        <button class="btn-action primary" onclick="renderLots()" style="white-space:nowrap">🔍 Rechercher</button>
-        <button class="btn-action" onclick="resetSearch()" style="white-space:nowrap">✕ Réinitialiser</button>
+        <button class="btn-action" onclick="document.getElementById('search').value='';document.getElementById('filter-lieu').value='';filterLots()" title="Réinitialiser">✕</button>
       </div>
       <div id="lots-list"><div class="loading">Chargement…</div></div>
     </div>
@@ -748,7 +747,7 @@ function lotCardHTML(id, l, isChild=false){
   const code = lotCode(l);
   const ops = l.historique ? Object.keys(l.historique).length : 0;
   const indent = isChild ? 'margin-left:1.5rem;border-left:3px solid var(--border);border-radius:0 8px 8px 0;' : '';
-  return `<div class="lot-card" onclick="openLot('${id}')" style="${indent}">
+  return `<div class="lot-card" data-lot-id="${id}" onclick="openLot('${id}')" style="${indent}">
     <div class="lot-header">
       <div>
         <div class="lot-num">🦪 <span style="font-family:monospace;font-size:${isChild?'.9':'1'}rem;font-weight:600">${code}</span></div>
@@ -763,21 +762,52 @@ function lotCardHTML(id, l, isChild=false){
 }
 
 function lotMatch(l, q, fl){
-  // Recherche flexible : sur numéro brut, code affiché, origine, lieu
-  const code = lotCode(l).toLowerCase();
-  const num = (l.numero||'').toLowerCase();
+  const code = lotCode(l).toLowerCase().replace(/[|\-]/g,'');
+  const num = (l.numero||'').toLowerCase().replace(/[|\-]/g,'');
   const orig = (l.origine||'').toLowerCase();
   const lieu = (l.lieuActuel||'').toLowerCase();
-  const mq = !q || num.includes(q) || code.includes(q) || orig.includes(q) || lieu.includes(q)
-            || num.replace(/[^a-z0-9]/gi,'').includes(q.replace(/[^a-z0-9]/gi,''));
+  const qs = q.replace(/[|\-]/g,'');
+  const mq = !qs || num.includes(qs) || code.includes(qs) || orig.includes(qs) || lieu.includes(qs);
   const ml = !fl || l.lieuActuel === fl;
   return mq && ml;
 }
 
-window.resetSearch = ()=>{
-  document.getElementById('search').value='';
-  document.getElementById('filter-lieu').value='';
-  renderLots();
+window.filterLots = ()=>{
+  const q = (document.getElementById('search').value||'').toLowerCase().trim().replace(/[|\-]/g,'');
+  const fl = document.getElementById('filter-lieu').value;
+  // On parcourt tous les groupes déjà rendus et on les cache/montre
+  const allEntries = Object.entries(lots);
+  const children = allEntries.filter(([id,l])=>l.numero.match(/-(T|C|Q)$/i));
+
+  // Pour chaque groupe dans le DOM, on vérifie si le lot parent ou ses enfants matchent
+  allEntries.forEach(([id,l])=>{
+    const isChild = l.numero.match(/-(T|C|Q)$/i);
+    if(isChild) return; // géré via le groupe parent
+    const groupEl = document.getElementById('grp-'+id);
+    const cardEl  = document.querySelector(`[data-lot-id="${id}"]`);
+    if(!cardEl) return;
+    const myKids = children.filter(([cid,cl])=>cl.numero.startsWith(l.numero+'-'));
+    const parentMatch = lotMatch(l, q, fl);
+    const kidMatches  = myKids.filter(([cid,cl])=>lotMatch(cl, q, fl));
+    const visible = parentMatch || kidMatches.length > 0;
+    cardEl.closest('.lot-group').style.display = visible ? '' : 'none';
+    // Si filtre actif, montrer les fractions qui matchent et cacher les autres
+    if(groupEl && myKids.length){
+      myKids.forEach(([cid,cl])=>{
+        const kidEl = document.querySelector(`[data-lot-id="${cid}"]`);
+        if(kidEl){
+          const show = (!q && !fl) || lotMatch(cl, q, fl);
+          kidEl.style.display = show ? '' : 'none';
+        }
+      });
+      // Auto-ouvrir si filtre actif et des enfants matchent
+      if((q||fl) && kidMatches.length){
+        groupEl.style.display='block';
+        const btn=document.getElementById('btn-grp-'+id);
+        if(btn) btn.textContent='▲ '+myKids.length+' fraction(s)';
+      }
+    }
+  });
 };
 
 function renderLots(){
@@ -803,15 +833,13 @@ function renderLots(){
   }
 
   document.getElementById('lots-list').innerHTML=filteredParents.map(([id,l])=>{
-    // Enfants filtrés : si filtre actif, ne montrer que ceux qui matchent
-    const myChildren = children.filter(([cid,cl])=>cl.numero.startsWith(l.numero+'-'))
-      .filter(([cid,cl])=> (!q && !fl) || lotMatch(cl, q, fl));
+    const myChildren = children.filter(([cid,cl])=>cl.numero.startsWith(l.numero+'-'));
     const hasChildren = myChildren.length > 0;
     const groupId = 'grp-'+id;
     let html = '';
     if(hasChildren){
-      html += `<div style="margin-bottom:10px">
-        <div class="lot-card" style="margin-bottom:0;border-radius:12px 12px ${myChildren.length?'0 0':'12px 12px'}" onclick="openLot('${id}')">
+      html += `<div class="lot-group" style="margin-bottom:10px">
+        <div class="lot-card" data-lot-id="${id}" style="margin-bottom:0;border-radius:12px 12px ${myChildren.length?'0 0':'12px 12px'}" onclick="openLot('${id}')">
           <div class="lot-header">
             <div>
               <div class="lot-num">🦪 <span style="font-family:monospace;font-size:1rem;font-weight:600">${lotCode(l)}</span></div>
@@ -822,7 +850,7 @@ function renderLots(){
                 ${lieuBadge(l.lieuActuel)}
                 <div style="font-size:.7rem;color:var(--text2);margin-top:3px">${l.historique?Object.keys(l.historique).length:0} opération(s)</div>
               </div>
-              <button onclick="event.stopPropagation();toggleGroup('${groupId}')" style="background:none;border:1px solid var(--border);border-radius:6px;padding:2px 6px;cursor:pointer;font-size:.75rem;color:var(--text2)" id="btn-${groupId}">
+              <button onclick="event.stopPropagation();toggleGroup('${groupId}')" style="background:none;border:1px solid var(--border);border-radius:6px;padding:2px 6px;cursor:pointer;font-size:.75rem;color:var(--text2)" id="btn-grp-${id}">
                 ▼ ${myChildren.length} fraction(s)
               </button>
             </div>
@@ -833,7 +861,7 @@ function renderLots(){
         </div>
       </div>`;
     } else {
-      html += '<div style="margin-bottom:10px">'+lotCardHTML(id,l,false)+'</div>';
+      html += '<div class="lot-group" style="margin-bottom:10px">'+lotCardHTML(id,l,false)+'</div>';
     }
     return html;
   }).join('');
