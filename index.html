@@ -590,6 +590,15 @@ window.openOp = (type)=>{
     </select></div>`;
   }
   html+=`<div class="field-inline"><label>Notes</label><textarea id="op-notes" rows="2" placeholder="Observations…"></textarea></div>`;
+  if(type==='Criblage'||type==='Calibrage'||type==='Dédoublage'){
+    html+=`<div class="field-inline">
+      <label>Note qualité (optionnel)</label>
+      <div style="display:flex;align-items:center;gap:10px">
+        <input type="number" id="op-note20" min="0" max="20" step="0.5" placeholder="—" style="width:80px">
+        <span style="font-size:.8rem;color:var(--text2)">/ 20</span>
+      </div>
+    </div>`;
+  }
   html+=`<button class="btn-action primary btn-full" onclick="saveOp('${type}')">Enregistrer</button>`;
   document.getElementById('modal-op-body').innerHTML=html;
   document.getElementById('overlay-op').classList.add('open');
@@ -660,6 +669,8 @@ window.saveOp = async (type)=>{
     detail='Remise à l\'eau à '+newLieu;
   }
   if(notes) detail+=' ('+notes+')';
+  const note20El = document.getElementById('op-note20');
+  if(note20El && note20El.value!=='') detail+=' [Note: '+note20El.value+'/20]';
 
   const typeKey = type.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z]/g,'');
   const entry = {type:typeKey,date,lieu,detail,ts:Date.now()};
@@ -749,40 +760,38 @@ function lotCardHTML(id, l, isChild=false){
   </div>`;
 }
 
+function lotMatch(l, q, fl){
+  const mq = !q || l.numero.toLowerCase().includes(q) || (l.origine||'').toLowerCase().includes(q) || (l.lieuActuel||'').toLowerCase().includes(q);
+  const ml = !fl || l.lieuActuel === fl;
+  return mq && ml;
+}
+
 function renderLots(){
-  const q=(document.getElementById('search').value||'').toLowerCase();
-  const fl=document.getElementById('filter-lieu').value;
+  const q = (document.getElementById('search').value||'').toLowerCase().trim();
+  const fl = document.getElementById('filter-lieu').value;
 
-  // Séparer parents et enfants (enfants = numéro contient -T, -C ou -Q)
   const allEntries = Object.entries(lots);
-  const parents = allEntries.filter(([id,l])=>!l.numero.match(/-(T|C|Q)$/i));
-  const children = allEntries.filter(([id,l])=>l.numero.match(/-(T|C|Q)$/i));
+  const parents  = allEntries.filter(([id,l])=>!l.numero.match(/-(T|C|Q)$/i));
+  const children = allEntries.filter(([id,l])=> l.numero.match(/-(T|C|Q)$/i));
 
-  // Filtrage
+  // Un parent est visible si lui-même matche, OU si un de ses enfants matche
   const filteredParents = parents.filter(([id,l])=>{
-    const mq=!q||l.numero.toLowerCase().includes(q)||(l.origine||'').toLowerCase().includes(q);
-    const ml=!fl||l.lieuActuel===fl;
-    // inclure aussi si un enfant matche
-    const childMatch = children.filter(([cid,cl])=>cl.numero.startsWith(l.numero+'-'));
-    const childMl = childMatch.some(([cid,cl])=>!fl||cl.lieuActuel===fl);
-    return mq&&(ml||childMl);
+    if(lotMatch(l, q, fl)) return true;
+    const myKids = children.filter(([cid,cl])=>cl.numero.startsWith(l.numero+'-'));
+    return myKids.some(([cid,cl])=>lotMatch(cl, q, fl));
   }).sort((a,b)=>b[1].createdAt-a[1].createdAt);
 
   if(!filteredParents.length){
-    // Si filtre lieu actif, chercher aussi dans les enfants seuls
-    const orphans = children.filter(([id,l])=>{
-      const mq=!q||l.numero.toLowerCase().includes(q)||(l.origine||'').toLowerCase().includes(q);
-      const ml=!fl||l.lieuActuel===fl;
-      return mq&&ml;
-    });
+    const orphans = children.filter(([id,l])=>lotMatch(l, q, fl));
     if(!orphans.length){document.getElementById('lots-list').innerHTML='<div class="empty">Aucun lot trouvé.</div>';return;}
     document.getElementById('lots-list').innerHTML=orphans.map(([id,l])=>lotCardHTML(id,l,false)).join('');
     return;
   }
 
   document.getElementById('lots-list').innerHTML=filteredParents.map(([id,l])=>{
+    // Enfants filtrés : si filtre actif, ne montrer que ceux qui matchent
     const myChildren = children.filter(([cid,cl])=>cl.numero.startsWith(l.numero+'-'))
-      .filter(([cid,cl])=>!fl||cl.lieuActuel===fl);
+      .filter(([cid,cl])=> (!q && !fl) || lotMatch(cl, q, fl));
     const hasChildren = myChildren.length > 0;
     const groupId = 'grp-'+id;
     let html = '';
