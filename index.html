@@ -158,8 +158,8 @@
   <div class="auth-card">
     <div class="auth-logo">
       <div class="icon">🦪</div>
-      <h1>Suivi des lots d'huîtres</h1>
-      <p>Traçabilité complète de vos lots</p>
+      <h1>KYS Marine</h1>
+      <p>Suivi des lots d'huîtres</p>
     </div>
 
     <div id="login-form">
@@ -173,12 +173,12 @@
       </div>
       <div class="auth-error" id="login-error"></div>
       <button class="btn btn-primary" onclick="doLogin()">Se connecter</button>
-      <button class="btn btn-outline" onclick="showRegister()">Créer un compte</button>
+      <button class="btn btn-outline" onclick="showRegister()">Demander un accès</button>
     </div>
 
     <div id="register-form" style="display:none">
       <div class="field">
-        <label>Nom</label>
+        <label>Nom complet</label>
         <input type="text" id="reg-name" placeholder="Votre nom">
       </div>
       <div class="field">
@@ -190,15 +190,24 @@
         <input type="password" id="reg-password" placeholder="Minimum 6 caractères">
       </div>
       <div class="auth-error" id="reg-error"></div>
-      <button class="btn btn-primary" onclick="doRegister()">Créer le compte</button>
-      <button class="btn btn-outline" onclick="showLogin()">Déjà un compte ? Se connecter</button>
+      <button class="btn btn-primary" onclick="doRegister()">Envoyer la demande</button>
+      <button class="btn btn-outline" onclick="showLogin()">Retour à la connexion</button>
     </div>
 
     <div id="firebase-setup-notice" class="setup-box" style="margin-top:1rem;display:none">
       <strong>⚠️ Configuration Firebase requise</strong>
       Remplacez la configuration Firebase en haut du fichier JS par vos propres clés.
-      Voir les instructions dans le fichier.
     </div>
+  </div>
+</div>
+
+<!-- ÉCRAN EN ATTENTE -->
+<div id="pending-screen" style="display:none;align-items:center;justify-content:center;min-height:100vh;padding:1rem">
+  <div class="auth-card" style="text-align:center">
+    <div style="font-size:2.5rem;margin-bottom:1rem">⏳</div>
+    <h2 style="font-size:1.1rem;font-weight:600;margin-bottom:.5rem">Demande en attente</h2>
+    <p style="font-size:.85rem;color:var(--text2);margin-bottom:1.5rem">Votre demande d'accès a été envoyée à l'administrateur. Vous recevrez une confirmation dès qu'elle sera approuvée.</p>
+    <button class="btn btn-outline" onclick="doLogout()" style="width:auto;padding:.5rem 1.5rem">Se déconnecter</button>
   </div>
 </div>
 
@@ -224,6 +233,7 @@
       <button class="tab" onclick="showTab('lots')">📦 Lots</button>
       <button class="tab" onclick="showTab('nouveau')">➕ Nouveau lot</button>
       <button class="tab" onclick="showTab('export')">📥 Export</button>
+      <button class="tab" id="tab-admin-btn" onclick="showTab('admin')" style="display:none">👤 Utilisateurs</button>
     </div>
 
     <!-- DASHBOARD -->
@@ -289,6 +299,18 @@
       <div class="card" style="margin-top:12px">
         <div class="card-title">Répartition par lieu</div>
         <div id="repartition-list"><div class="loading">Chargement…</div></div>
+      </div>
+    </div>
+
+    <!-- ADMIN -->
+    <div id="tab-admin" class="section">
+      <div class="card" style="margin-bottom:12px">
+        <div class="card-title">Demandes d'accès en attente</div>
+        <div id="admin-pending-list"><div class="loading">Chargement…</div></div>
+      </div>
+      <div class="card">
+        <div class="card-title">Utilisateurs actifs</div>
+        <div id="admin-users-list"><div class="loading">Chargement…</div></div>
       </div>
     </div>
   </div>
@@ -359,6 +381,8 @@ let cribSelected = '';
 window._lots = lots;
 
 // ─── AUTH ───
+let currentUserData = null;
+
 window.showRegister = ()=>{
   document.getElementById('login-form').style.display='none';
   document.getElementById('register-form').style.display='block';
@@ -369,7 +393,7 @@ window.showLogin = ()=>{
 };
 
 window.doLogin = async ()=>{
-  if(!configReady){alert('Configurez Firebase d\'abord (voir instructions dans le fichier HTML).');return;}
+  if(!configReady){alert('Configurez Firebase d\'abord.');return;}
   const email = document.getElementById('login-email').value.trim();
   const pass = document.getElementById('login-password').value;
   document.getElementById('login-error').textContent='';
@@ -390,13 +414,16 @@ window.doRegister = async ()=>{
   try{
     const cred = await createUserWithEmailAndPassword(auth, email, pass);
     await updateProfile(cred.user, {displayName: name});
-    // Trigger onAuthStateChanged
+    const usersSnap = await get(ref(db,'users'));
+    const isFirst = Object.keys(usersSnap.val()||{}).length === 0;
+    await set(ref(db,'users/'+cred.user.uid),{name,email,role:isFirst?'admin':'pending',createdAt:Date.now()});
   }catch(e){
     document.getElementById('reg-error').textContent = friendlyError(e.code);
   }
 };
 
 window.doLogout = async ()=>{
+  currentUserData = null;
   await signOut(auth);
 };
 
@@ -412,20 +439,76 @@ function friendlyError(code){
   return map[code]||'Erreur : '+code;
 }
 
+function showScreen(name){
+  document.getElementById('auth-screen').style.display = name==='auth' ? 'flex' : 'none';
+  document.getElementById('pending-screen').style.display = name==='pending' ? 'flex' : 'none';
+  document.getElementById('app').style.display = name==='app' ? 'flex' : 'none';
+}
+
 if(configReady){
-  onAuthStateChanged(auth, user=>{
+  onAuthStateChanged(auth, async user=>{
     if(user){
-      document.getElementById('auth-screen').style.display='none';
-      document.getElementById('app').style.display='flex';
-      document.getElementById('user-name-badge').textContent = user.displayName||user.email;
+      const snap = await get(ref(db,'users/'+user.uid));
+      const userData = snap.val();
+      if(!userData){showScreen('pending');return;}
+      currentUserData = {...userData, uid:user.uid};
+      if(userData.role==='pending'||userData.role==='refused'){showScreen('pending');return;}
+      showScreen('app');
+      document.getElementById('user-name-badge').textContent = userData.name||user.email;
+      const adminBtn = document.getElementById('tab-admin-btn');
+      if(adminBtn) adminBtn.style.display = userData.role==='admin' ? 'block' : 'none';
       document.getElementById('n-date').value = todayStr();
       loadLots();
+      if(userData.role==='admin') loadUsers();
     } else {
-      document.getElementById('auth-screen').style.display='flex';
-      document.getElementById('app').style.display='none';
+      currentUserData = null;
+      showScreen('auth');
     }
   });
 }
+
+// ─── ADMIN USERS ───
+function loadUsers(){
+  onValue(ref(db,'users'), snap=>{
+    renderAdminUsers(snap.val()||{});
+  });
+}
+
+function renderAdminUsers(users){
+  const pending = Object.entries(users).filter(([uid,u])=>u.role==='pending');
+  const others  = Object.entries(users).filter(([uid,u])=>u.role!=='pending');
+  const pendingEl = document.getElementById('admin-pending-list');
+  if(pendingEl){
+    pendingEl.innerHTML = pending.length ? pending.map(([uid,u])=>`
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--border);font-size:.85rem">
+        <div><div style="font-weight:500">${u.name}</div><div style="color:var(--text2);font-size:.75rem">${u.email}</div></div>
+        <div style="display:flex;gap:6px">
+          <button class="btn-action" style="font-size:.75rem;padding:4px 10px;background:#eaf3de;border-color:#639922;color:#3b6d11" onclick="approveUser('${uid}')">✓ Approuver</button>
+          <button class="btn-action" style="font-size:.75rem;padding:4px 10px;background:#fcebeb;border-color:#e24b4a;color:#a32d2d" onclick="refuseUser('${uid}')">✕ Refuser</button>
+        </div>
+      </div>`).join('') : '<div class="empty" style="padding:1rem">Aucune demande en attente.</div>';
+  }
+  const usersEl = document.getElementById('admin-users-list');
+  if(usersEl){
+    usersEl.innerHTML = others.length ? others.map(([uid,u])=>`
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--border);font-size:.85rem">
+        <div>
+          <div style="font-weight:500">${u.name}${u.role==='admin'?' <span style=\"background:#e6f1fb;color:#0c447c;font-size:.7rem;padding:1px 6px;border-radius:4px\">Admin</span>':''}</div>
+          <div style="color:var(--text2);font-size:.75rem">${u.email}</div>
+        </div>
+        <div style="display:flex;gap:6px;align-items:center">
+          <span style="font-size:.75rem;padding:2px 8px;border-radius:4px;${u.role==='refused'?'background:#fcebeb;color:#a32d2d':'background:#eaf3de;color:#3b6d11'}">${u.role==='refused'?'Refusé':u.role==='admin'?'Admin':'Actif'}</span>
+          ${u.role!=='admin'?`<button class="btn-action" style="font-size:.75rem;padding:4px 10px" onclick="toggleUser('${uid}','${u.role}')">${u.role==='refused'?'Réactiver':'Désactiver'}</button>`:''}
+          ${u.role!=='admin'?`<button class="btn-action" style="font-size:.75rem;padding:4px 10px;background:#e6f1fb;border-color:#185fa5;color:#0c447c" onclick="promoteAdmin('${uid}')">→ Admin</button>`:''}
+        </div>
+      </div>`).join('') : '<div class="empty" style="padding:1rem">Aucun utilisateur.</div>';
+  }
+}
+
+window.approveUser  = async (uid)=>{ await update(ref(db,'users/'+uid),{role:'approved'}); };
+window.refuseUser   = async (uid)=>{ await update(ref(db,'users/'+uid),{role:'refused'}); };
+window.toggleUser   = async (uid,role)=>{ await update(ref(db,'users/'+uid),{role:role==='refused'?'approved':'refused'}); };
+window.promoteAdmin = async (uid)=>{ if(!confirm('Promouvoir en administrateur ?'))return; await update(ref(db,'users/'+uid),{role:'admin'}); };
 
 // ─── DATA ───
 function lotsRef(){ return ref(db,'lots'); }
