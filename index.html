@@ -253,12 +253,14 @@
     <!-- LOTS -->
     <div id="tab-lots" class="section">
       <div class="search-bar">
-        <input type="text" id="search" placeholder="Rechercher un lot…" oninput="renderLots()">
+        <input type="text" id="search" placeholder="Rechercher un lot…" onkeydown="if(event.key==='Enter')renderLots()">
         <select id="filter-lieu" onchange="renderLots()">
           <option value="">Tous les lieux</option>
           <option value="Riantec">Riantec</option><option value="Carnac">Carnac</option><option value="Locmariaquer">Locmariaquer</option>
           <option value="Etel">Etel</option><option value="St Hélène">St Hélène</option><option value="Blaver">Blaver</option><option value="Golf">Golf</option>
         </select>
+        <button class="btn-action primary" onclick="renderLots()" style="white-space:nowrap">🔍 Rechercher</button>
+        <button class="btn-action" onclick="resetSearch()" style="white-space:nowrap">✕ Réinitialiser</button>
       </div>
       <div id="lots-list"><div class="loading">Chargement…</div></div>
     </div>
@@ -761,10 +763,22 @@ function lotCardHTML(id, l, isChild=false){
 }
 
 function lotMatch(l, q, fl){
-  const mq = !q || l.numero.toLowerCase().includes(q) || (l.origine||'').toLowerCase().includes(q) || (l.lieuActuel||'').toLowerCase().includes(q);
+  // Recherche flexible : sur numéro brut, code affiché, origine, lieu
+  const code = lotCode(l).toLowerCase();
+  const num = (l.numero||'').toLowerCase();
+  const orig = (l.origine||'').toLowerCase();
+  const lieu = (l.lieuActuel||'').toLowerCase();
+  const mq = !q || num.includes(q) || code.includes(q) || orig.includes(q) || lieu.includes(q)
+            || num.replace(/[^a-z0-9]/gi,'').includes(q.replace(/[^a-z0-9]/gi,''));
   const ml = !fl || l.lieuActuel === fl;
   return mq && ml;
 }
+
+window.resetSearch = ()=>{
+  document.getElementById('search').value='';
+  document.getElementById('filter-lieu').value='';
+  renderLots();
+};
 
 function renderLots(){
   const q = (document.getElementById('search').value||'').toLowerCase().trim();
