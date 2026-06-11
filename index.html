@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>KYS Marine — Suivi des lots</title>
+<title>Suivi des lots d'huîtres</title>
 <style>
   *{box-sizing:border-box;margin:0;padding:0}
   :root{
@@ -247,7 +247,7 @@
         <select id="filter-lieu" onchange="renderLots()">
           <option value="">Tous les lieux</option>
           <option>Riantec</option><option>Carnac</option><option>Locmariaquer</option>
-          <option>Etel</option><option>St Hélène</option><option>Blavet</option><option>Golf</option>
+          <option>Etel</option><option>St Hélène</option><option>Blaver</option><option>Golf</option>
         </select>
       </div>
       <div id="lots-list"><div class="loading">Chargement…</div></div>
@@ -265,8 +265,8 @@
           <div class="field-inline"><label>Origine</label><input type="text" id="n-origine" placeholder="ex: Bretagne Nord"></div>
           <div class="field-inline"><label>Lieu initial</label>
             <select id="n-lieu">
-              <option>R:antec</option><option>Carnac</option><option>Locmariaquer</option>
-              <option>Etel</option><option>St Belène</option><option>Blaver</option><option>Golf</option>
+              <option>Riantec</option><option>Carnac</option><option>Locmariaquer</option>
+              <option>Etel</option><option>St Hélène</option><option>Blaver</option><option>Golf</option>
             </select>
           </div>
         </div>
@@ -454,8 +454,8 @@ window.creerLot = async ()=>{
     historique: {}
   };
   const newRef = push(lotsRef());
+  const hKey = newRef.key+'_init';
   lot.historique = {};
-  const hKey = push(ref(db,'_tmp')).key;
   lot.historique[hKey]={type:'creation',date:lot.dateEntree,lieu:lot.lieuActuel,detail:'Lot créé',ts:Date.now()};
   await set(newRef, lot);
   ['n-num','n-origine','n-notes','n-qte'].forEach(id=>document.getElementById(id).value='');
@@ -544,10 +544,10 @@ window.deleteLot = async (id)=>{
 };
 
 // ─── RENDER ───
-const LIEUX = ['R:antec','Carnac','Locmariaquer','Etel','St Belène','Blaver','Golf'];
+const LIEUX = ['Riantec','Carnac','Locmariaquer','Etel','St Hélène','Blaver','Golf'];
 const LIEU_BADGE = {
-  'R:antec':'b-blue','Carnac':'b-teal','Locmariaquer':'b-amber',
-  'Etel':'b-coral','St Belène':'b-purple','Blaver':'b-gray','Golf':'b-pink'
+  'Riantec':'b-blue','Carnac':'b-teal','Locmariaquer':'b-amber',
+  'Etel':'b-coral','St Hélène':'b-purple','Blaver':'b-gray','Golf':'b-pink'
 };
 
 function lieuBadge(lieu){
