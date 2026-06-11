@@ -472,12 +472,29 @@ window.openOp = (type)=>{
   document.getElementById('modal-op-title').textContent = type;
   let html = `<div class="field-inline" style="margin-bottom:12px"><label>Date</label><input type="date" id="op-date" value="${todayStr()}"></div>`;
   if(type==='Criblage'){
-    html+=`<div class="field-inline"><label>Résultat du criblage</label>
-    <div class="crib-grid">
-      <button class="op-btn" id="c-tete" onclick="selectCrib(this,'Tête de lot')">⬆ Tête de lot</button>
-      <button class="op-btn" id="c-coeur" onclick="selectCrib(this,'Cœur de lot')">◉ Cœur de lot</button>
-      <button class="op-btn" id="c-queue" onclick="selectCrib(this,'Queue de lot')">⬇ Queue de lot</button>
-    </div></div>`;
+    const lieuOptions = LIEUX.map(l=>`<option value="${l}">${l}</option>`).join('');
+    html+=`
+    <p style="font-size:.8rem;color:var(--text2);margin-bottom:10px">Cochez les fractions obtenues et choisissez leur lieu de destination. Les fractions cochées créeront de nouveaux lots.</p>
+    <div style="border:1px solid var(--border);border-radius:8px;overflow:hidden;margin-bottom:10px">
+      <div style="display:grid;grid-template-columns:auto 1fr 1fr;gap:0;font-size:.75rem;font-weight:500;color:var(--text2);padding:6px 10px;background:var(--bg);border-bottom:1px solid var(--border)">
+        <span style="width:24px"></span><span>Fraction</span><span>Lieu de destination</span>
+      </div>
+      <div style="display:grid;grid-template-columns:auto 1fr 1fr;align-items:center;gap:0;padding:8px 10px;border-bottom:1px solid var(--border)">
+        <input type="checkbox" id="cb-tete" style="width:18px;height:18px;margin-right:8px">
+        <label for="cb-tete" style="font-size:.85rem;font-weight:500">⬆ Tête de lot</label>
+        <select id="lieu-tete" style="font-size:.8rem;padding:4px 6px">${lieuOptions}</select>
+      </div>
+      <div style="display:grid;grid-template-columns:auto 1fr 1fr;align-items:center;gap:0;padding:8px 10px;border-bottom:1px solid var(--border)">
+        <input type="checkbox" id="cb-coeur" style="width:18px;height:18px;margin-right:8px">
+        <label for="cb-coeur" style="font-size:.85rem;font-weight:500">◉ Cœur de lot</label>
+        <select id="lieu-coeur" style="font-size:.8rem;padding:4px 6px">${lieuOptions}</select>
+      </div>
+      <div style="display:grid;grid-template-columns:auto 1fr 1fr;align-items:center;gap:0;padding:8px 10px">
+        <input type="checkbox" id="cb-queue" style="width:18px;height:18px;margin-right:8px">
+        <label for="cb-queue" style="font-size:.85rem;font-weight:500">⬇ Queue de lot</label>
+        <select id="lieu-queue" style="font-size:.8rem;padding:4px 6px">${lieuOptions}</select>
+      </div>
+    </div>`;
   }
   if(type==='Déplacement'){
     html+=`<div class="field-inline"><label>Nouveau lieu</label><select id="op-lieu">
@@ -509,8 +526,45 @@ window.saveOp = async (type)=>{
   let detail=type, lieu=lot.lieuActuel, newLieu=null;
 
   if(type==='Criblage'){
-    if(!cribSelected){alert('Sélectionnez un résultat de criblage.');return;}
-    detail='Criblage → '+cribSelected;
+    const fractions = [
+      {id:'tete', label:'Tête de lot'},
+      {id:'coeur', label:'Cœur de lot'},
+      {id:'queue', label:'Queue de lot'}
+    ].filter(f=>document.getElementById('cb-'+f.id)?.checked);
+    if(!fractions.length){alert('Cochez au moins une fraction.');return;}
+    // Create a child lot for each checked fraction
+    for(const f of fractions){
+      const destLieu = document.getElementById('lieu-'+f.id).value;
+      const initOrigine = lot.origine ? lot.origine.charAt(0).toUpperCase() : '?';
+      const initLieu = destLieu.charAt(0).toUpperCase();
+      const annee2 = String(lot.annee).slice(-2);
+      const newNumero = lot.numero + '-' + f.label.charAt(0);
+      const childLot = {
+        numero: newNumero,
+        annee: lot.annee,
+        origine: lot.origine,
+        lieuActuel: destLieu,
+        quantite: null,
+        dateEntree: date,
+        notes: 'Issu du criblage du lot ' + lot.numero + (notes?' - '+notes:''),
+        createdAt: Date.now(),
+        historique: {}
+      };
+      const childRef = push(lotsRef());
+      const hKey2 = childRef.key+'_init';
+      childLot.historique[hKey2]={type:'creation',date,lieu:destLieu,detail:'Lot créé par criblage ('+f.label+') depuis lot '+lot.numero,ts:Date.now()};
+      await set(childRef, childLot);
+    }
+    const fractionLabels = fractions.map(f=>f.label+' → '+document.getElementById('lieu-'+f.id).value).join(', ');
+    detail = 'Criblage → ' + fractionLabels;
+    lieu = lot.lieuActuel;
+    const typeKey2 = 'criblage';
+    const entry2 = {type:typeKey2,date,lieu,detail:(notes?detail+' ('+notes+')':detail),ts:Date.now()};
+    const hRef2 = push(ref(db,'lots/'+currentLotId+'/historique'));
+    await set(hRef2, entry2);
+    closeModal('overlay-op');
+    setTimeout(()=>openLot(currentLotId),300);
+    return;
   }
   if(type==='Déplacement'){
     newLieu=document.getElementById('op-lieu').value;
