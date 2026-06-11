@@ -638,40 +638,110 @@ function renderStats(){
     </li>`).join('');
 }
 
+function lotCode(l){
+  const initOrigine = l.origine ? l.origine.charAt(0).toUpperCase() : '?';
+  const initLieu = l.lieuActuel ? l.lieuActuel.charAt(0).toUpperCase() : '?';
+  const annee2 = String(l.annee).slice(-2);
+  const fractionMatch = l.numero.match(/-(T|C|Q)$/i);
+  const fractionSuffix = fractionMatch ? '|' + fractionMatch[1].toUpperCase() : '';
+  const numeroBase = l.numero.replace(/-(T|C|Q)$/i, '');
+  return numeroBase + initOrigine + annee2 + '|' + initLieu + fractionSuffix;
+}
+
+function lotCardHTML(id, l, isChild=false){
+  const code = lotCode(l);
+  const ops = l.historique ? Object.keys(l.historique).length : 0;
+  const indent = isChild ? 'margin-left:1.5rem;border-left:3px solid var(--border);border-radius:0 8px 8px 0;' : '';
+  return `<div class="lot-card" onclick="openLot('${id}')" style="${indent}">
+    <div class="lot-header">
+      <div>
+        <div class="lot-num">🦪 <span style="font-family:monospace;font-size:${isChild?'.9':'1'}rem;font-weight:600">${code}</span></div>
+        <div class="lot-meta">${l.origine||'Origine inconnue'}${l.quantite?' · '+l.quantite+' dz':''}</div>
+      </div>
+      <div style="text-align:right">
+        ${lieuBadge(l.lieuActuel)}
+        <div style="font-size:.7rem;color:var(--text2);margin-top:3px">${ops} opération(s)</div>
+      </div>
+    </div>
+  </div>`;
+}
+
 function renderLots(){
   const q=(document.getElementById('search').value||'').toLowerCase();
   const fl=document.getElementById('filter-lieu').value;
-  const arr=Object.entries(lots).filter(([id,l])=>{
+
+  // Séparer parents et enfants (enfants = numéro contient -T, -C ou -Q)
+  const allEntries = Object.entries(lots);
+  const parents = allEntries.filter(([id,l])=>!l.numero.match(/-(T|C|Q)$/i));
+  const children = allEntries.filter(([id,l])=>l.numero.match(/-(T|C|Q)$/i));
+
+  // Filtrage
+  const filteredParents = parents.filter(([id,l])=>{
     const mq=!q||l.numero.toLowerCase().includes(q)||(l.origine||'').toLowerCase().includes(q);
     const ml=!fl||l.lieuActuel===fl;
-    return mq&&ml;
+    // inclure aussi si un enfant matche
+    const childMatch = children.filter(([cid,cl])=>cl.numero.startsWith(l.numero+'-'));
+    const childMl = childMatch.some(([cid,cl])=>!fl||cl.lieuActuel===fl);
+    return mq&&(ml||childMl);
   }).sort((a,b)=>b[1].createdAt-a[1].createdAt);
-  if(!arr.length){document.getElementById('lots-list').innerHTML='<div class="empty">Aucun lot trouvé.</div>';return;}
-  document.getElementById('lots-list').innerHTML=arr.map(([id,l])=>{
-    const initOrigine = l.origine ? l.origine.charAt(0).toUpperCase() : '?';
-    const initLieu = l.lieuActuel ? l.lieuActuel.charAt(0).toUpperCase() : '?';
-    const annee2 = String(l.annee).slice(-2);
-    // Détection fraction criblage : numéro se termine par -T, -C ou -Q
-    const fractionMatch = l.numero.match(/-(T|C|Q)$/i);
-    const fractionSuffix = fractionMatch ? '|' + fractionMatch[1].toUpperCase() : '';
-    // Numéro de base sans le suffixe fraction pour l'affichage
-    const numeroBase = l.numero.replace(/-(T|C|Q)$/i, '');
-    const codeAffichage = numeroBase + initOrigine + annee2 + '|' + initLieu + fractionSuffix;
-    return `
-    <div class="lot-card" onclick="openLot('${id}')">
-      <div class="lot-header">
-        <div>
-          <div class="lot-num">🦪 <span style="font-family:monospace;font-size:1rem;font-weight:600">${codeAffichage}</span></div>
-          <div class="lot-meta">${l.origine||'Origine inconnue'}${l.quantite?' · '+l.quantite+' dz':''}</div>
+
+  if(!filteredParents.length){
+    // Si filtre lieu actif, chercher aussi dans les enfants seuls
+    const orphans = children.filter(([id,l])=>{
+      const mq=!q||l.numero.toLowerCase().includes(q)||(l.origine||'').toLowerCase().includes(q);
+      const ml=!fl||l.lieuActuel===fl;
+      return mq&&ml;
+    });
+    if(!orphans.length){document.getElementById('lots-list').innerHTML='<div class="empty">Aucun lot trouvé.</div>';return;}
+    document.getElementById('lots-list').innerHTML=orphans.map(([id,l])=>lotCardHTML(id,l,false)).join('');
+    return;
+  }
+
+  document.getElementById('lots-list').innerHTML=filteredParents.map(([id,l])=>{
+    const myChildren = children.filter(([cid,cl])=>cl.numero.startsWith(l.numero+'-'))
+      .filter(([cid,cl])=>!fl||cl.lieuActuel===fl);
+    const hasChildren = myChildren.length > 0;
+    const groupId = 'grp-'+id;
+    let html = '';
+    if(hasChildren){
+      html += `<div style="margin-bottom:10px">
+        <div class="lot-card" style="margin-bottom:0;border-radius:12px 12px ${myChildren.length?'0 0':'12px 12px'}" onclick="openLot('${id}')">
+          <div class="lot-header">
+            <div>
+              <div class="lot-num">🦪 <span style="font-family:monospace;font-size:1rem;font-weight:600">${lotCode(l)}</span></div>
+              <div class="lot-meta">${l.origine||'Origine inconnue'}${l.quantite?' · '+l.quantite+' dz':''}</div>
+            </div>
+            <div style="display:flex;align-items:center;gap:8px">
+              <div style="text-align:right">
+                ${lieuBadge(l.lieuActuel)}
+                <div style="font-size:.7rem;color:var(--text2);margin-top:3px">${l.historique?Object.keys(l.historique).length:0} opération(s)</div>
+              </div>
+              <button onclick="event.stopPropagation();toggleGroup('${groupId}')" style="background:none;border:1px solid var(--border);border-radius:6px;padding:2px 6px;cursor:pointer;font-size:.75rem;color:var(--text2)" id="btn-${groupId}">
+                ▼ ${myChildren.length} fraction(s)
+              </button>
+            </div>
+          </div>
         </div>
-        <div style="text-align:right">
-          ${lieuBadge(l.lieuActuel)}
-          <div style="font-size:.7rem;color:var(--text2);margin-top:3px">${l.historique?Object.keys(l.historique).length:0} opération(s)</div>
+        <div id="${groupId}" style="display:none">
+          ${myChildren.map(([cid,cl])=>lotCardHTML(cid,cl,true)).join('')}
         </div>
-      </div>
-    </div>`;
+      </div>`;
+    } else {
+      html += '<div style="margin-bottom:10px">'+lotCardHTML(id,l,false)+'</div>';
+    }
+    return html;
   }).join('');
 }
+
+window.toggleGroup = (groupId)=>{
+  const el = document.getElementById(groupId);
+  const btn = document.getElementById('btn-'+groupId);
+  if(!el)return;
+  const isOpen = el.style.display !== 'none';
+  el.style.display = isOpen ? 'none' : 'block';
+  const count = el.querySelectorAll('.lot-card').length;
+  btn.textContent = isOpen ? '▼ '+count+' fraction(s)' : '▲ '+count+' fraction(s)';
+};
 
 window.openLot = (id)=>{
   currentLotId=id;
