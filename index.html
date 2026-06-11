@@ -1,0 +1,694 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Suivi des lots d'huîtres</title>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  :root{
+    --bg:#f8f9fa;--surface:#fff;--border:#e2e8f0;--text:#1a202c;--text2:#718096;
+    --primary:#0ea5e9;--primary-dark:#0284c7;--teal:#0f9e75;--amber:#b97a15;
+    --coral:#c03a1d;--purple:#534ab7;--danger:#e24b4a;
+  }
+  body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:var(--bg);color:var(--text);min-height:100vh}
+  
+  /* AUTH */
+  #auth-screen{display:flex;align-items:center;justify-content:center;min-height:100vh;padding:1rem}
+  .auth-card{background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:2rem;width:100%;max-width:360px}
+  .auth-logo{text-align:center;margin-bottom:1.5rem}
+  .auth-logo .icon{font-size:2.5rem}
+  .auth-logo h1{font-size:1.25rem;font-weight:600;margin-top:.5rem}
+  .auth-logo p{font-size:.85rem;color:var(--text2);margin-top:.25rem}
+  .field{margin-bottom:1rem}
+  .field label{display:block;font-size:.8rem;font-weight:500;margin-bottom:.35rem;color:var(--text2)}
+  .field input{width:100%;padding:.6rem .85rem;border:1px solid var(--border);border-radius:8px;font-size:.9rem;background:var(--surface);color:var(--text);outline:none;transition:border .15s}
+  .field input:focus{border-color:var(--primary)}
+  .btn{width:100%;padding:.65rem;border:none;border-radius:8px;font-size:.9rem;font-weight:500;cursor:pointer;transition:background .15s}
+  .btn-primary{background:var(--primary);color:#fff}
+  .btn-primary:hover{background:var(--primary-dark)}
+  .btn-outline{background:transparent;border:1px solid var(--border);color:var(--text);margin-top:.5rem}
+  .btn-outline:hover{background:var(--bg)}
+  .auth-error{color:var(--danger);font-size:.8rem;margin-top:.5rem;text-align:center;min-height:1rem}
+  .auth-switch{text-align:center;font-size:.8rem;color:var(--text2);margin-top:1rem}
+  .auth-switch a{color:var(--primary);cursor:pointer;text-decoration:none}
+
+  /* APP LAYOUT */
+  #app{display:none;min-height:100vh;flex-direction:column}
+  header{background:var(--surface);border-bottom:1px solid var(--border);padding:.75rem 1.5rem;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:50}
+  .header-left{display:flex;align-items:center;gap:.75rem}
+  .header-logo{font-size:1.1rem;font-weight:600}
+  .header-sub{font-size:.75rem;color:var(--text2)}
+  .header-right{display:flex;align-items:center;gap:.75rem}
+  .user-badge{font-size:.8rem;color:var(--text2);background:var(--bg);padding:.3rem .7rem;border-radius:6px;border:1px solid var(--border)}
+  .btn-sm{padding:.3rem .7rem;font-size:.8rem;border-radius:6px;cursor:pointer;border:1px solid var(--border);background:transparent;color:var(--text)}
+  .btn-sm:hover{background:var(--bg)}
+  .main{flex:1;padding:1.5rem;max-width:900px;margin:0 auto;width:100%}
+
+  /* TABS */
+  .tabs{display:flex;gap:4px;border-bottom:1px solid var(--border);margin-bottom:1.5rem;overflow-x:auto}
+  .tab{padding:.5rem 1rem;font-size:.85rem;background:none;border:none;cursor:pointer;color:var(--text2);border-bottom:2px solid transparent;margin-bottom:-1px;white-space:nowrap;transition:color .15s}
+  .tab.active{color:var(--text);border-bottom-color:var(--primary);font-weight:500}
+  .section{display:none}.section.active{display:block}
+
+  /* CARDS */
+  .card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:1.25rem;margin-bottom:12px}
+  .card-title{font-size:.95rem;font-weight:500;margin-bottom:1rem}
+
+  /* STATS */
+  .stat-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;margin-bottom:1.5rem}
+  .stat{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:1rem;text-align:center}
+  .stat-num{font-size:1.6rem;font-weight:600}
+  .stat-lbl{font-size:.75rem;color:var(--text2);margin-top:.2rem}
+
+  /* FORM */
+  .form-row{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  .form-row3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px}
+  .field-inline label{font-size:.8rem;font-weight:500;margin-bottom:.3rem;display:block;color:var(--text2)}
+  .field-inline input,.field-inline select,.field-inline textarea{width:100%;padding:.55rem .8rem;border:1px solid var(--border);border-radius:8px;font-size:.85rem;background:var(--surface);color:var(--text);font-family:inherit;outline:none}
+  .field-inline input:focus,.field-inline select:focus,.field-inline textarea:focus{border-color:var(--primary)}
+  .field-inline{margin-bottom:12px}
+
+  /* LOTS */
+  .lot-card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:1rem 1.25rem;margin-bottom:10px;cursor:pointer;transition:border-color .15s}
+  .lot-card:hover{border-color:var(--primary)}
+  .lot-header{display:flex;align-items:center;justify-content:space-between}
+  .lot-num{font-size:.95rem;font-weight:500}
+  .lot-meta{font-size:.75rem;color:var(--text2);margin-top:.2rem}
+
+  /* BADGES */
+  .badge{display:inline-block;padding:2px 8px;border-radius:6px;font-size:.7rem;font-weight:500}
+  .b-teal{background:#e1f5ee;color:#0a6647}
+  .b-blue{background:#e6f1fb;color:#0c447c}
+  .b-amber{background:#faeeda;color:#633806}
+  .b-coral{background:#faece7;color:#7a2e14}
+  .b-purple{background:#eeedfe;color:#3c3489}
+  .b-gray{background:#f1efe8;color:#444}
+  .b-pink{background:#fbeaf0;color:#72243e}
+
+  /* SEARCH BAR */
+  .search-bar{display:flex;gap:8px;margin-bottom:1rem;flex-wrap:wrap}
+  .search-bar input{flex:1;min-width:150px;padding:.55rem .8rem;border:1px solid var(--border);border-radius:8px;font-size:.85rem;background:var(--surface);color:var(--text);outline:none}
+  .search-bar input:focus{border-color:var(--primary)}
+  .search-bar select{padding:.55rem .8rem;border:1px solid var(--border);border-radius:8px;font-size:.85rem;background:var(--surface);color:var(--text);min-width:130px}
+
+  /* TIMELINE */
+  .timeline{list-style:none;padding:0}
+  .tl-item{display:flex;gap:10px;padding-bottom:14px;position:relative}
+  .tl-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0;margin-top:4px}
+  .tl-line{position:absolute;left:4px;top:14px;bottom:0;width:1px;background:var(--border)}
+  .tl-item:last-child .tl-line{display:none}
+  .dot-creation{background:#aaa}
+  .dot-criblage{background:var(--teal)}
+  .dot-calibrage{background:var(--amber)}
+  .dot-dedoublage{background:var(--purple)}
+  .dot-deplacement{background:var(--primary)}
+  .dot-remise{background:var(--coral)}
+  .tl-title{font-size:.82rem;font-weight:500}
+  .tl-meta{font-size:.75rem;color:var(--text2);margin-top:1px}
+
+  /* MODAL */
+  .overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:200;align-items:center;justify-content:center;padding:1rem}
+  .overlay.open{display:flex}
+  .modal{background:var(--surface);border-radius:16px;padding:1.5rem;width:100%;max-width:480px;max-height:90vh;overflow-y:auto}
+  .modal-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem}
+  .modal-title{font-size:1rem;font-weight:500}
+  .close-btn{background:none;border:none;font-size:1.1rem;cursor:pointer;color:var(--text2);padding:.2rem .4rem;border-radius:6px}
+  .close-btn:hover{background:var(--bg)}
+
+  /* OP BUTTONS */
+  .op-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:1rem}
+  .op-btn{padding:.8rem .5rem;border:1px solid var(--border);border-radius:8px;background:var(--surface);cursor:pointer;font-size:.8rem;text-align:center;color:var(--text);transition:all .15s}
+  .op-btn:hover{border-color:var(--primary);background:#f0f9ff}
+  .op-btn.selected{border-color:var(--primary);background:#e0f2fe;font-weight:500}
+  .crib-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin-bottom:10px}
+
+  /* BUTTONS */
+  .btn-action{padding:.55rem 1rem;border-radius:8px;font-size:.85rem;font-weight:500;cursor:pointer;border:1px solid var(--border);background:var(--surface);color:var(--text);display:inline-flex;align-items:center;gap:.4rem;transition:all .15s}
+  .btn-action:hover{background:var(--bg)}
+  .btn-action.primary{background:var(--primary);color:#fff;border-color:var(--primary)}
+  .btn-action.primary:hover{background:var(--primary-dark)}
+  .btn-action.danger{color:var(--danger);border-color:var(--danger)}
+  .btn-action.danger:hover{background:#fff5f5}
+  .btn-full{width:100%;justify-content:center;margin-top:.5rem}
+
+  /* EXPORT */
+  .export-bar{display:flex;gap:8px;margin-bottom:1rem;flex-wrap:wrap}
+
+  /* LOADING */
+  .loading{text-align:center;padding:2rem;color:var(--text2);font-size:.9rem}
+  .empty{text-align:center;padding:2.5rem;color:var(--text2);font-size:.9rem}
+
+  /* SETUP INFO */
+  .setup-box{background:#fffbeb;border:1px solid #fcd34d;border-radius:10px;padding:1rem 1.25rem;margin-bottom:1.5rem;font-size:.82rem;line-height:1.6}
+  .setup-box strong{display:block;margin-bottom:.3rem;font-size:.85rem}
+  .setup-box code{background:#fef3c7;padding:1px 5px;border-radius:4px;font-family:monospace;font-size:.8rem}
+
+  @media(max-width:500px){
+    .form-row,.form-row3{grid-template-columns:1fr}
+    .main{padding:1rem}
+    header{padding:.75rem 1rem}
+  }
+</style>
+</head>
+<body>
+
+<!-- ═══════════════════ AUTH SCREEN ═══════════════════ -->
+<div id="auth-screen">
+  <div class="auth-card">
+    <div class="auth-logo">
+      <div class="icon">🦪</div>
+      <h1>Suivi des lots d'huîtres</h1>
+      <p>Traçabilité complète de vos lots</p>
+    </div>
+
+    <div id="login-form">
+      <div class="field">
+        <label>Email</label>
+        <input type="email" id="login-email" placeholder="votre@email.com" autocomplete="email">
+      </div>
+      <div class="field">
+        <label>Mot de passe</label>
+        <input type="password" id="login-password" placeholder="••••••••" autocomplete="current-password">
+      </div>
+      <div class="auth-error" id="login-error"></div>
+      <button class="btn btn-primary" onclick="doLogin()">Se connecter</button>
+      <button class="btn btn-outline" onclick="showRegister()">Créer un compte</button>
+    </div>
+
+    <div id="register-form" style="display:none">
+      <div class="field">
+        <label>Nom</label>
+        <input type="text" id="reg-name" placeholder="Votre nom">
+      </div>
+      <div class="field">
+        <label>Email</label>
+        <input type="email" id="reg-email" placeholder="votre@email.com">
+      </div>
+      <div class="field">
+        <label>Mot de passe</label>
+        <input type="password" id="reg-password" placeholder="Minimum 6 caractères">
+      </div>
+      <div class="auth-error" id="reg-error"></div>
+      <button class="btn btn-primary" onclick="doRegister()">Créer le compte</button>
+      <button class="btn btn-outline" onclick="showLogin()">Déjà un compte ? Se connecter</button>
+    </div>
+
+    <div id="firebase-setup-notice" class="setup-box" style="margin-top:1rem;display:none">
+      <strong>⚠️ Configuration Firebase requise</strong>
+      Remplacez la configuration Firebase en haut du fichier JS par vos propres clés.
+      Voir les instructions dans le fichier.
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════ APP ═══════════════════ -->
+<div id="app" style="display:none;flex-direction:column">
+  <header>
+    <div class="header-left">
+      <span>🦪</span>
+      <div>
+        <div class="header-logo">Lots d'huîtres</div>
+        <div class="header-sub">Traçabilité</div>
+      </div>
+    </div>
+    <div class="header-right">
+      <span class="user-badge" id="user-name-badge"></span>
+      <button class="btn-sm" onclick="doLogout()">Déconnexion</button>
+    </div>
+  </header>
+
+  <div class="main">
+    <div class="tabs">
+      <button class="tab active" onclick="showTab('dashboard')">📊 Tableau de bord</button>
+      <button class="tab" onclick="showTab('lots')">📦 Lots</button>
+      <button class="tab" onclick="showTab('nouveau')">➕ Nouveau lot</button>
+      <button class="tab" onclick="showTab('export')">📥 Export</button>
+    </div>
+
+    <!-- DASHBOARD -->
+    <div id="tab-dashboard" class="section active">
+      <div class="stat-grid" id="stats">
+        <div class="stat"><div class="stat-num" id="s-total">—</div><div class="stat-lbl">Lots actifs</div></div>
+        <div class="stat"><div class="stat-num" id="s-ops">—</div><div class="stat-lbl">Opérations</div></div>
+        <div class="stat"><div class="stat-num" id="s-lieux">—</div><div class="stat-lbl">Lieux</div></div>
+        <div class="stat"><div class="stat-num" id="s-recent">—</div><div class="stat-lbl">Ops ce mois</div></div>
+      </div>
+      <div class="card">
+        <div class="card-title">Activité récente</div>
+        <ul class="timeline" id="recent-list"><li class="loading">Chargement…</li></ul>
+      </div>
+    </div>
+
+    <!-- LOTS -->
+    <div id="tab-lots" class="section">
+      <div class="search-bar">
+        <input type="text" id="search" placeholder="Rechercher un lot…" oninput="renderLots()">
+        <select id="filter-lieu" onchange="renderLots()">
+          <option value="">Tous les lieux</option>
+          <option>R:antec</option><option>Carnac</option><option>Locmariaquer</option>
+          <option>Etel</option><option>St Belène</option><option>Blaver</option><option>Golf</option>
+        </select>
+      </div>
+      <div id="lots-list"><div class="loading">Chargement…</div></div>
+    </div>
+
+    <!-- NOUVEAU LOT -->
+    <div id="tab-nouveau" class="section">
+      <div class="card">
+        <div class="card-title">Créer un nouveau lot</div>
+        <div class="form-row">
+          <div class="field-inline"><label>Numéro de lot *</label><input type="text" id="n-num" placeholder="ex: 155 26"></div>
+          <div class="field-inline"><label>Année</label><input type="number" id="n-annee" value="2025"></div>
+        </div>
+        <div class="form-row">
+          <div class="field-inline"><label>Origine</label><input type="text" id="n-origine" placeholder="ex: Bretagne Nord"></div>
+          <div class="field-inline"><label>Lieu initial</label>
+            <select id="n-lieu">
+              <option>R:antec</option><option>Carnac</option><option>Locmariaquer</option>
+              <option>Etel</option><option>St Belène</option><option>Blaver</option><option>Golf</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="field-inline"><label>Quantité (douzaines)</label><input type="number" id="n-qte" placeholder="ex: 500"></div>
+          <div class="field-inline"><label>Date d'entrée</label><input type="date" id="n-date"></div>
+        </div>
+        <div class="field-inline"><label>Notes</label><textarea id="n-notes" rows="2" placeholder="Observations…"></textarea></div>
+        <button class="btn-action primary btn-full" onclick="creerLot()">Créer le lot</button>
+      </div>
+    </div>
+
+    <!-- EXPORT -->
+    <div id="tab-export" class="section">
+      <div class="card">
+        <div class="card-title">Exporter les données</div>
+        <p style="font-size:.85rem;color:var(--text2);margin-bottom:1rem">Téléchargez l'ensemble de vos données au format Excel (.xlsx) avec deux onglets : <em>Lots</em> et <em>Historique complet</em>.</p>
+        <button class="btn-action primary" onclick="exportExcel()">📥 Télécharger Excel</button>
+      </div>
+      <div class="card" style="margin-top:12px">
+        <div class="card-title">Répartition par lieu</div>
+        <div id="repartition-list"><div class="loading">Chargement…</div></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL LOT DETAIL -->
+<div class="overlay" id="overlay-lot">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title" id="modal-lot-title">Lot</div>
+      <button class="close-btn" onclick="closeModal('overlay-lot')">✕</button>
+    </div>
+    <div id="modal-lot-body"></div>
+  </div>
+</div>
+
+<!-- MODAL OPERATION -->
+<div class="overlay" id="overlay-op">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title" id="modal-op-title">Opération</div>
+      <button class="close-btn" onclick="closeModal('overlay-op')">✕</button>
+    </div>
+    <div id="modal-op-body"></div>
+  </div>
+</div>
+
+<!-- ═══════════════════ FIREBASE + APP JS ═══════════════════ -->
+<script type="module">
+// ─────────────────────────────────────────────
+// 🔧 CONFIGURATION FIREBASE
+// Remplacez ces valeurs par les vôtres depuis :
+// console.firebase.google.com → votre projet → Paramètres → Ajouter une app web
+// ─────────────────────────────────────────────
+const FIREBASE_CONFIG = {
+  apiKey: "AIzaSyBYVn8SEYbC1KTJuBe3Z5sedXYy9ZLGZFI",
+  authDomain: "kys-marine-lots.firebaseapp.com",
+  databaseURL: "https://kys-marine-lots-default-rtdb.europe-west1.firebasedatabase.app",
+  projectId: "kys-marine-lots",
+  storageBucket: "kys-marine-lots.firebasestorage.app",
+  messagingSenderId: "234141201906",
+  appId: "1:234141201906:web:cc132a329a2bcdf2aee76b"
+};
+// ─────────────────────────────────────────────
+
+import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
+import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, updateProfile } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js';
+import { getDatabase, ref, push, set, get, update, remove, onValue, serverTimestamp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js';
+import * as XLSX from 'https://cdn.jsdelivr.net/npm/xlsx@0.18.5/+esm';
+
+// Détection config non remplie
+const configReady = FIREBASE_CONFIG.apiKey !== "VOTRE_API_KEY";
+if(!configReady){
+  document.getElementById('firebase-setup-notice').style.display='block';
+}
+
+let app, auth, db;
+if(configReady){
+  app = initializeApp(FIREBASE_CONFIG);
+  auth = getAuth(app);
+  db = getDatabase(app);
+}
+
+// ─── ÉTAT ───
+let lots = {};
+let currentLotId = null;
+let cribSelected = '';
+window._lots = lots;
+
+// ─── AUTH ───
+window.showRegister = ()=>{
+  document.getElementById('login-form').style.display='none';
+  document.getElementById('register-form').style.display='block';
+};
+window.showLogin = ()=>{
+  document.getElementById('register-form').style.display='none';
+  document.getElementById('login-form').style.display='block';
+};
+
+window.doLogin = async ()=>{
+  if(!configReady){alert('Configurez Firebase d\'abord (voir instructions dans le fichier HTML).');return;}
+  const email = document.getElementById('login-email').value.trim();
+  const pass = document.getElementById('login-password').value;
+  document.getElementById('login-error').textContent='';
+  try{
+    await signInWithEmailAndPassword(auth, email, pass);
+  }catch(e){
+    document.getElementById('login-error').textContent = friendlyError(e.code);
+  }
+};
+
+window.doRegister = async ()=>{
+  if(!configReady){alert('Configurez Firebase d\'abord.');return;}
+  const name = document.getElementById('reg-name').value.trim();
+  const email = document.getElementById('reg-email').value.trim();
+  const pass = document.getElementById('reg-password').value;
+  document.getElementById('reg-error').textContent='';
+  if(!name){document.getElementById('reg-error').textContent='Nom requis.';return;}
+  try{
+    const cred = await createUserWithEmailAndPassword(auth, email, pass);
+    await updateProfile(cred.user, {displayName: name});
+    // Trigger onAuthStateChanged
+  }catch(e){
+    document.getElementById('reg-error').textContent = friendlyError(e.code);
+  }
+};
+
+window.doLogout = async ()=>{
+  await signOut(auth);
+};
+
+function friendlyError(code){
+  const map = {
+    'auth/invalid-email':'Email invalide.',
+    'auth/user-not-found':'Aucun compte avec cet email.',
+    'auth/wrong-password':'Mot de passe incorrect.',
+    'auth/email-already-in-use':'Email déjà utilisé.',
+    'auth/weak-password':'Mot de passe trop court (6 caractères min).',
+    'auth/invalid-credential':'Email ou mot de passe incorrect.',
+  };
+  return map[code]||'Erreur : '+code;
+}
+
+if(configReady){
+  onAuthStateChanged(auth, user=>{
+    if(user){
+      document.getElementById('auth-screen').style.display='none';
+      document.getElementById('app').style.display='flex';
+      document.getElementById('user-name-badge').textContent = user.displayName||user.email;
+      document.getElementById('n-date').value = todayStr();
+      loadLots();
+    } else {
+      document.getElementById('auth-screen').style.display='flex';
+      document.getElementById('app').style.display='none';
+    }
+  });
+}
+
+// ─── DATA ───
+function lotsRef(){ return ref(db,'lots'); }
+function lotRef(id){ return ref(db,'lots/'+id); }
+
+function loadLots(){
+  onValue(lotsRef(), snap=>{
+    lots = snap.val()||{};
+    window._lots = lots;
+    renderAll();
+  });
+}
+
+window.creerLot = async ()=>{
+  const num = document.getElementById('n-num').value.trim();
+  if(!num){alert('Numéro de lot requis.');return;}
+  const lot = {
+    numero: num,
+    annee: parseInt(document.getElementById('n-annee').value)||new Date().getFullYear(),
+    origine: document.getElementById('n-origine').value.trim(),
+    lieuActuel: document.getElementById('n-lieu').value,
+    quantite: parseInt(document.getElementById('n-qte').value)||null,
+    dateEntree: document.getElementById('n-date').value||todayStr(),
+    notes: document.getElementById('n-notes').value.trim(),
+    createdAt: Date.now(),
+    historique: {}
+  };
+  const newRef = push(lotsRef());
+  lot.historique = {};
+  const hKey = push(ref(db,'_tmp')).key;
+  lot.historique[hKey]={type:'creation',date:lot.dateEntree,lieu:lot.lieuActuel,detail:'Lot créé',ts:Date.now()};
+  await set(newRef, lot);
+  ['n-num','n-origine','n-notes','n-qte'].forEach(id=>document.getElementById(id).value='');
+  document.getElementById('n-date').value=todayStr();
+  showTab('lots');
+  alert('Lot '+num+' créé !');
+};
+
+// ─── OPERATIONS ───
+window.openOp = (type)=>{
+  const lot = lots[currentLotId];
+  if(!lot)return;
+  cribSelected='';
+  document.getElementById('modal-op-title').textContent = type;
+  let html = `<div class="field-inline" style="margin-bottom:12px"><label>Date</label><input type="date" id="op-date" value="${todayStr()}"></div>`;
+  if(type==='Criblage'){
+    html+=`<div class="field-inline"><label>Résultat du criblage</label>
+    <div class="crib-grid">
+      <button class="op-btn" id="c-tete" onclick="selectCrib(this,'Tête de lot')">⬆ Tête de lot</button>
+      <button class="op-btn" id="c-coeur" onclick="selectCrib(this,'Cœur de lot')">◉ Cœur de lot</button>
+      <button class="op-btn" id="c-queue" onclick="selectCrib(this,'Queue de lot')">⬇ Queue de lot</button>
+    </div></div>`;
+  }
+  if(type==='Déplacement'){
+    html+=`<div class="field-inline"><label>Nouveau lieu</label><select id="op-lieu">
+      ${LIEUX.filter(l=>l!==lot.lieuActuel).map(l=>`<option>${l}</option>`).join('')}
+    </select></div>`;
+  }
+  if(type==='Remise à l\'eau'){
+    html+=`<div class="field-inline"><label>Lieu de remise à l'eau</label><select id="op-lieu">
+      ${LIEUX.map(l=>`<option ${l===lot.lieuActuel?'selected':''}>${l}</option>`).join('')}
+    </select></div>`;
+  }
+  html+=`<div class="field-inline"><label>Notes</label><textarea id="op-notes" rows="2" placeholder="Observations…"></textarea></div>`;
+  html+=`<button class="btn-action primary btn-full" onclick="saveOp('${type}')">Enregistrer</button>`;
+  document.getElementById('modal-op-body').innerHTML=html;
+  document.getElementById('overlay-op').classList.add('open');
+};
+
+window.selectCrib = (btn, val)=>{
+  cribSelected=val;
+  document.querySelectorAll('.crib-grid .op-btn').forEach(b=>b.classList.remove('selected'));
+  btn.classList.add('selected');
+};
+
+window.saveOp = async (type)=>{
+  const lot = lots[currentLotId];
+  if(!lot)return;
+  const date = document.getElementById('op-date').value||todayStr();
+  const notes = document.getElementById('op-notes')?document.getElementById('op-notes').value.trim():'';
+  let detail=type, lieu=lot.lieuActuel, newLieu=null;
+
+  if(type==='Criblage'){
+    if(!cribSelected){alert('Sélectionnez un résultat de criblage.');return;}
+    detail='Criblage → '+cribSelected;
+  }
+  if(type==='Déplacement'){
+    newLieu=document.getElementById('op-lieu').value;
+    detail='Déplacement : '+lot.lieuActuel+' → '+newLieu;
+    lieu=newLieu;
+  }
+  if(type==='Remise à l\'eau'){
+    newLieu=document.getElementById('op-lieu').value;
+    lieu=newLieu;
+    detail='Remise à l\'eau à '+newLieu;
+  }
+  if(notes) detail+=' ('+notes+')';
+
+  const typeKey = type.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z]/g,'');
+  const entry = {type:typeKey,date,lieu,detail,ts:Date.now()};
+  const hRef = push(ref(db,'lots/'+currentLotId+'/historique'));
+  await set(hRef, entry);
+  if(newLieu) await update(lotRef(currentLotId),{lieuActuel:newLieu});
+
+  closeModal('overlay-op');
+  // Refresh lot detail
+  setTimeout(()=>openLot(currentLotId),300);
+};
+
+window.deleteLot = async (id)=>{
+  const lot = lots[id];
+  if(!lot)return;
+  if(!confirm('Supprimer le lot '+lot.numero+' ? Cette action est irréversible.'))return;
+  await remove(lotRef(id));
+  closeModal('overlay-lot');
+};
+
+// ─── RENDER ───
+const LIEUX = ['R:antec','Carnac','Locmariaquer','Etel','St Belène','Blaver','Golf'];
+const LIEU_BADGE = {
+  'R:antec':'b-blue','Carnac':'b-teal','Locmariaquer':'b-amber',
+  'Etel':'b-coral','St Belène':'b-purple','Blaver':'b-gray','Golf':'b-pink'
+};
+
+function lieuBadge(lieu){
+  return `<span class="badge ${LIEU_BADGE[lieu]||'b-gray'}">${lieu}</span>`;
+}
+
+function todayStr(){return new Date().toISOString().split('T')[0];}
+
+function histoArr(lot){
+  if(!lot.historique)return[];
+  return Object.values(lot.historique).sort((a,b)=>a.ts-b.ts);
+}
+
+function renderStats(){
+  const arr = Object.values(lots);
+  const ops = arr.reduce((s,l)=>s+(l.historique?Object.keys(l.historique).length:0),0);
+  const lieux = new Set(arr.map(l=>l.lieuActuel)).size;
+  const now = new Date(); const mm = now.getMonth(), yy = now.getFullYear();
+  const recent = arr.flatMap(l=>histoArr(l)).filter(h=>{
+    const d=new Date(h.date); return d.getMonth()===mm&&d.getFullYear()===yy;
+  }).length;
+  document.getElementById('s-total').textContent=arr.length;
+  document.getElementById('s-ops').textContent=ops;
+  document.getElementById('s-lieux').textContent=lieux;
+  document.getElementById('s-recent').textContent=recent;
+
+  const allOps = arr.flatMap(l=>histoArr(l).map(h=>({...h,lotNum:l.numero,lotId:Object.keys(lots).find(k=>lots[k]===l)}))).sort((a,b)=>b.ts-a.ts).slice(0,10);
+  if(!allOps.length){document.getElementById('recent-list').innerHTML='<div class="empty">Aucune activité.</div>';return;}
+  document.getElementById('recent-list').innerHTML=allOps.map(h=>`
+    <li class="tl-item">
+      <div class="tl-dot dot-${h.type}"></div><div class="tl-line"></div>
+      <div><div class="tl-title">Lot ${h.lotNum} — ${h.detail}</div>
+      <div class="tl-meta">${h.date}${h.lieu?' · '+h.lieu:''}</div></div>
+    </li>`).join('');
+}
+
+function renderLots(){
+  const q=(document.getElementById('search').value||'').toLowerCase();
+  const fl=document.getElementById('filter-lieu').value;
+  const arr=Object.entries(lots).filter(([id,l])=>{
+    const mq=!q||l.numero.toLowerCase().includes(q)||(l.origine||'').toLowerCase().includes(q);
+    const ml=!fl||l.lieuActuel===fl;
+    return mq&&ml;
+  }).sort((a,b)=>b[1].createdAt-a[1].createdAt);
+  if(!arr.length){document.getElementById('lots-list').innerHTML='<div class="empty">Aucun lot trouvé.</div>';return;}
+  document.getElementById('lots-list').innerHTML=arr.map(([id,l])=>`
+    <div class="lot-card" onclick="openLot('${id}')">
+      <div class="lot-header">
+        <div>
+          <div class="lot-num">🦪 ${l.numero} <span style="font-weight:400;font-size:.75rem;color:var(--text2)">${l.annee}</span></div>
+          <div class="lot-meta">${l.origine||'Origine inconnue'}${l.quantite?' · '+l.quantite+' dz':''}</div>
+        </div>
+        <div style="text-align:right">
+          ${lieuBadge(l.lieuActuel)}
+          <div style="font-size:.7rem;color:var(--text2);margin-top:3px">${l.historique?Object.keys(l.historique).length:0} opération(s)</div>
+        </div>
+      </div>
+    </div>`).join('');
+}
+
+window.openLot = (id)=>{
+  currentLotId=id;
+  const lot=lots[id];
+  if(!lot)return;
+  document.getElementById('modal-lot-title').textContent='Lot '+lot.numero;
+  const hist=histoArr(lot).reverse();
+  const OPS=[['Criblage','🔬'],['Calibrage','📏'],['Dédoublage','✂️'],['Déplacement','📍'],['Remise à l\'eau','💧']];
+  document.getElementById('modal-lot-body').innerHTML=`
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:1rem;font-size:.82rem">
+      <div><span style="color:var(--text2)">Origine</span><br><strong>${lot.origine||'—'}</strong></div>
+      <div><span style="color:var(--text2)">Lieu actuel</span><br>${lieuBadge(lot.lieuActuel)}</div>
+      <div><span style="color:var(--text2)">Année</span><br><strong>${lot.annee}</strong></div>
+      <div><span style="color:var(--text2)">Quantité</span><br><strong>${lot.quantite?lot.quantite+' dz':'—'}</strong></div>
+    </div>
+    <div style="margin-bottom:1rem">
+      <div style="font-size:.82rem;font-weight:500;margin-bottom:8px;color:var(--text2)">Ajouter une opération</div>
+      <div class="op-grid">${OPS.map(([op,ic])=>`<button class="op-btn" onclick="openOp('${op}')">${ic} ${op}</button>`).join('')}</div>
+    </div>
+    <div style="font-size:.82rem;font-weight:500;margin-bottom:8px">Historique (${hist.length})</div>
+    <ul class="timeline">${hist.length?hist.map(h=>`
+      <li class="tl-item">
+        <div class="tl-dot dot-${h.type}"></div><div class="tl-line"></div>
+        <div><div class="tl-title">${h.detail}</div><div class="tl-meta">${h.date}${h.lieu?' · '+h.lieu:''}</div></div>
+      </li>`).join(''):'<div class="empty" style="padding:1rem">Aucune opération.</div>'}</ul>
+    <div style="margin-top:1rem;border-top:1px solid var(--border);padding-top:1rem">
+      <button class="btn-action danger" onclick="deleteLot('${id}')">🗑 Supprimer ce lot</button>
+    </div>`;
+  document.getElementById('overlay-lot').classList.add('open');
+};
+
+function renderExport(){
+  const arr=Object.values(lots);
+  const lieux={};
+  arr.forEach(l=>{lieux[l.lieuActuel]=(lieux[l.lieuActuel]||0)+1;});
+  const rows=Object.entries(lieux).sort((a,b)=>b[1]-a[1]);
+  document.getElementById('repartition-list').innerHTML=rows.length?rows.map(([l,n])=>`
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border);font-size:.85rem">
+      <span>${lieuBadge(l)}</span>
+      <span style="font-weight:500">${n} lot${n>1?'s':''}</span>
+    </div>`).join(''):'<div class="empty">Aucune donnée.</div>';
+}
+
+window.exportExcel = ()=>{
+  const arr=Object.entries(lots);
+  if(!arr.length){alert('Aucun lot à exporter.');return;}
+  const wb=XLSX.utils.book_new();
+  const lotsData=[['Numéro','Année','Origine','Lieu actuel','Quantité (dz)','Date entrée','Nb opérations','Notes'],
+    ...arr.map(([id,l])=>[l.numero,l.annee,l.origine,l.lieuActuel,l.quantite||'',l.dateEntree,l.historique?Object.keys(l.historique).length:0,l.notes||''])];
+  XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(lotsData),'Lots');
+  const histo=[['Lot','Type','Date','Lieu','Détail'],
+    ...arr.flatMap(([id,l])=>histoArr(l).map(h=>[l.numero,h.type,h.date,h.lieu||'',h.detail]))];
+  XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(histo),'Historique');
+  XLSX.writeFile(wb,'lots_huitres_'+todayStr()+'.xlsx');
+};
+
+function renderAll(){
+  renderStats();
+  renderLots();
+  renderExport();
+}
+
+// ─── TABS ───
+window.showTab = (name)=>{
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+  document.querySelectorAll('.section').forEach(s=>s.classList.remove('active'));
+  const names=['dashboard','lots','nouveau','export'];
+  document.querySelectorAll('.tab')[names.indexOf(name)]?.classList.add('active');
+  document.getElementById('tab-'+name)?.classList.add('active');
+};
+
+window.closeModal = (id)=>{
+  document.getElementById(id).classList.remove('open');
+};
+
+// Close overlay on background click
+document.querySelectorAll('.overlay').forEach(o=>{
+  o.addEventListener('click',e=>{if(e.target===o)o.classList.remove('open');});
+});
+
+// Enter key on login
+document.getElementById('login-password').addEventListener('keydown',e=>{if(e.key==='Enter')window.doLogin();});
+</script>
+</body>
+</html>
