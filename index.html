@@ -593,11 +593,16 @@ function renderLots(){
     return mq&&ml;
   }).sort((a,b)=>b[1].createdAt-a[1].createdAt);
   if(!arr.length){document.getElementById('lots-list').innerHTML='<div class="empty">Aucun lot trouvé.</div>';return;}
-  document.getElementById('lots-list').innerHTML=arr.map(([id,l])=>`
+  document.getElementById('lots-list').innerHTML=arr.map(([id,l])=>{
+    const initOrigine = l.origine ? l.origine.charAt(0).toUpperCase() : '?';
+    const initLieu = l.lieuActuel ? l.lieuActuel.charAt(0).toUpperCase() : '?';
+    const annee2 = String(l.annee).slice(-2);
+    const codeAffichage = l.numero + initOrigine + annee2 + '|' + initLieu;
+    return `
     <div class="lot-card" onclick="openLot('${id}')">
       <div class="lot-header">
         <div>
-          <div class="lot-num">🦪 ${l.numero} <span style="font-weight:400;font-size:.75rem;color:var(--text2)">${l.annee}</span></div>
+          <div class="lot-num">🦪 <span style="font-family:monospace;font-size:1rem;font-weight:600">${codeAffichage}</span></div>
           <div class="lot-meta">${l.origine||'Origine inconnue'}${l.quantite?' · '+l.quantite+' dz':''}</div>
         </div>
         <div style="text-align:right">
@@ -605,7 +610,8 @@ function renderLots(){
           <div style="font-size:.7rem;color:var(--text2);margin-top:3px">${l.historique?Object.keys(l.historique).length:0} opération(s)</div>
         </div>
       </div>
-    </div>`).join('');
+    </div>`;
+  }).join('');
 }
 
 window.openLot = (id)=>{
