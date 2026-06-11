@@ -549,6 +549,41 @@ window.creerLot = async ()=>{
 };
 
 // ─── OPERATIONS ───
+
+// ─── VENDABLE BLOCK ───
+function vendableHTML(){
+  return `
+  <div class="field-inline" style="margin-top:8px">
+    <label style="display:flex;align-items:center;gap:8px;cursor:pointer">
+      <input type="checkbox" id="op-vendable" onchange="toggleVendable()" style="width:16px;height:16px">
+      <span style="font-size:.85rem;font-weight:500">Vendable</span>
+    </label>
+  </div>
+  <div id="vendable-options" style="display:none;margin-top:8px;background:var(--bg);border-radius:8px;padding:10px;border:1px solid var(--border)">
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+      <div class="field-inline" style="margin-bottom:0">
+        <label>Calibre</label>
+        <select id="op-calibre">
+          <option value="K2">K2</option>
+          <option value="K3">K3</option>
+          <option value="F2">F2</option>
+          <option value="F3">F3</option>
+        </select>
+      </div>
+      <div class="field-inline" style="margin-bottom:0">
+        <label>Poids (kg)</label>
+        <input type="number" id="op-poids" min="0" step="0.1" placeholder="ex: 25.5">
+      </div>
+    </div>
+  </div>`;
+}
+
+window.toggleVendable = ()=>{
+  const cb = document.getElementById('op-vendable');
+  const opts = document.getElementById('vendable-options');
+  if(opts) opts.style.display = cb.checked ? 'block' : 'none';
+};
+
 window.openOp = (type)=>{
   const lot = lots[currentLotId];
   if(!lot)return;
@@ -557,6 +592,8 @@ window.openOp = (type)=>{
   let html = `<div class="field-inline" style="margin-bottom:12px"><label>Date</label><input type="date" id="op-date" value="${todayStr()}"></div>`;
   if(type==='Criblage'){
     const lieuOptions = LIEUX.map(l=>`<option value="${l}">${l}</option>`).join('');
+    html+=vendableHTML();
+    html+=`<div style="margin:10px 0;border-top:1px solid var(--border)"></div>`;
     html+=`
     <p style="font-size:.8rem;color:var(--text2);margin-bottom:10px">Cochez les fractions obtenues et choisissez leur lieu de destination. Les fractions cochées créeront de nouveaux lots.</p>
     <div style="border:1px solid var(--border);border-radius:8px;overflow:hidden;margin-bottom:10px">
@@ -580,6 +617,9 @@ window.openOp = (type)=>{
       </div>
     </div>`;
   }
+  if(type==='Au Tapis'){
+    detail = 'Au Tapis';
+  }
   if(type==='Déplacement'){
     html+=`<div class="field-inline"><label>Nouveau lieu</label><select id="op-lieu">
       ${LIEUX.filter(l=>l!==lot.lieuActuel).map(l=>`<option>${l}</option>`).join('')}
@@ -589,6 +629,9 @@ window.openOp = (type)=>{
     html+=`<div class="field-inline"><label>Lieu de remise à l'eau</label><select id="op-lieu">
       ${LIEUX.map(l=>`<option ${l===lot.lieuActuel?'selected':''}>${l}</option>`).join('')}
     </select></div>`;
+  }
+  if(type==='Au Tapis'){
+    html+=vendableHTML();
   }
   html+=`<div class="field-inline"><label>Notes</label><textarea id="op-notes" rows="2" placeholder="Observations…"></textarea></div>`;
   if(type==='Criblage'||type==='Calibrage'||type==='Dédoublage'){
@@ -672,6 +715,14 @@ window.saveOp = async (type)=>{
   if(notes) detail+=' ('+notes+')';
   const note20El = document.getElementById('op-note20');
   if(note20El && note20El.value!=='') detail+=' [Note: '+note20El.value+'/20]';
+
+  // Vendable
+  const vendableCb = document.getElementById('op-vendable');
+  if(vendableCb && vendableCb.checked){
+    const calibre = document.getElementById('op-calibre')?.value||'';
+    const poids   = document.getElementById('op-poids')?.value||'';
+    detail += ' [Vendable: '+calibre+(poids?' · '+poids+' kg':'')+']';
+  }
 
   const typeKey = type.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z]/g,'');
   const entry = {type:typeKey,date,lieu,detail,ts:Date.now()};
@@ -883,7 +934,7 @@ window.openLot = (id)=>{
   if(!lot)return;
   document.getElementById('modal-lot-title').textContent='Lot '+lot.numero;
   const hist=histoArr(lot).reverse();
-  const OPS=[['Criblage','🔬'],['Calibrage','📏'],['Dédoublage','✂️'],['Déplacement','📍'],['Remise à l\'eau','💧']];
+  const OPS=[['Criblage','🔬'],['Calibrage','📏'],['Dédoublage','✂️'],['Au Tapis','🪣'],['Déplacement','📍'],['Remise à l\'eau','💧']];
   document.getElementById('modal-lot-body').innerHTML=`
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:1rem;font-size:.82rem">
       <div><span style="color:var(--text2)">Origine</span><br><strong>${lot.origine||'—'}</strong></div>
