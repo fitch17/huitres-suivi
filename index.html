@@ -1010,51 +1010,10 @@ window.exportExcel = ()=>{
   XLSX.writeFile(wb,'lots_huitres_'+todayStr()+'.xlsx');
 };
 
-// ─── PLAN SHEETS ───
-const PLAN_LINKS = {
-  'Locmariaquer': 'https://docs.google.com/spreadsheets/d/1fZSf0x9VgglfhACek6wTpMHq7GrNu8W9JYcrwLTVLzs/edit?usp=sharing',
-  // Ajoutez d'autres parcs ici
-};
-
-function renderPlanLots(){
-  const el = document.getElementById('plan-lots-list');
-  if(!el) return;
-  const arr = Object.entries(lots).sort((a,b)=>b[1].createdAt-a[1].createdAt);
-  if(!arr.length){el.innerHTML='<div class="empty">Aucun lot.</div>';return;}
-
-  // Grouper par lieu
-  const byLieu = {};
-  arr.forEach(([id,l])=>{
-    if(!byLieu[l.lieuActuel]) byLieu[l.lieuActuel]=[];
-    byLieu[l.lieuActuel].push([id,l]);
-  });
-
-  el.innerHTML = Object.entries(byLieu).map(([lieu, lots])=>{
-    const planUrl = PLAN_LINKS[lieu];
-    return `
-    <div style="margin-bottom:16px">
-      <div style="font-size:.8rem;font-weight:500;color:var(--text2);margin-bottom:6px;text-transform:uppercase;letter-spacing:.05em">${lieu}</div>
-      <div style="display:flex;flex-wrap:wrap;gap:6px">
-        ${lots.map(([id,l])=>{
-          const code = lotCode(l);
-          if(planUrl){
-            return `<a href="${planUrl}" target="_blank" style="text-decoration:none">
-              <div style="padding:6px 12px;border:1px solid var(--border);border-radius:8px;background:var(--surface);cursor:pointer;font-size:.82rem;font-weight:500;font-family:monospace;transition:all .15s;color:var(--text)" onmouseover="this.style.background='#e0f2fe';this.style.borderColor='var(--primary)'" onmouseout="this.style.background='var(--surface)';this.style.borderColor='var(--border)'">${code} <span style="font-size:.7rem;color:var(--primary)">↗</span></div>
-            </a>`;
-          } else {
-            return `<div style="padding:6px 12px;border:1px solid var(--border);border-radius:8px;background:var(--bg);font-size:.82rem;font-weight:500;font-family:monospace;color:var(--text2)">${code}</div>`;
-          }
-        }).join('')}
-      </div>
-    </div>`;
-  }).join('');
-}
-
 function renderAll(){
   renderStats();
   renderLots();
   renderExport();
-  renderPlanLots();
 }
 
 // ─── TABS ───
