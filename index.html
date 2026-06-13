@@ -307,20 +307,27 @@
     <!-- PLAN -->
     <div id="tab-plan" class="section">
       <div class="card" style="margin-bottom:12px">
-        <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
-          <div style="font-size:.95rem;font-weight:500">Parc affiché :</div>
-          <select id="plan-select" onchange="changerPlan()" style="padding:.5rem .8rem;border:1px solid var(--border);border-radius:8px;font-size:.85rem;background:var(--surface);color:var(--text)">
-            <option value="https://docs.google.com/spreadsheets/d/e/2PACX-1vQWGPCB4JTavq94EOgrNsO42T0YMwgAbz8-ZfDg9WgyK1BidHDhueGM6QtlITWPo_AyfT0pdDx-caO1/pubhtml?gid=0&single=true">Locmariaquer</option>
-          </select>
-          <button class="btn-action" onclick="document.getElementById('plan-frame').src=document.getElementById('plan-select').value" style="font-size:.8rem">🔄 Actualiser</button>
+        <div style="font-size:.95rem;font-weight:500;margin-bottom:.5rem">🗺️ Plans des parcs</div>
+        <p style="font-size:.8rem;color:var(--text2)">Cliquez sur un lot pour ouvrir le plan du parc correspondant dans un nouvel onglet.</p>
+      </div>
+
+      <!-- Plans par lieu -->
+      <div class="card" style="margin-bottom:12px">
+        <div style="font-size:.85rem;font-weight:500;margin-bottom:10px">Accès rapide aux plans</div>
+        <div style="display:flex;flex-direction:column;gap:8px">
+          <a href="https://docs.google.com/spreadsheets/d/1fZSf0x9VgglfhACek6wTpMHq7GrNu8W9JYcrwLTVLzs/edit?usp=sharing" target="_blank" style="text-decoration:none">
+            <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 12px;border:1px solid var(--border);border-radius:8px;background:var(--surface);cursor:pointer;transition:border-color .15s" onmouseover="this.style.borderColor='var(--primary)'" onmouseout="this.style.borderColor='var(--border)'">
+              <div style="font-size:.85rem;font-weight:500">📋 Locmariaquer</div>
+              <div style="font-size:.75rem;color:var(--primary)">Ouvrir le plan →</div>
+            </div>
+          </a>
         </div>
       </div>
-      <div style="border:1px solid var(--border);border-radius:12px;overflow:hidden;background:var(--surface)">
-        <iframe id="plan-frame"
-          src="https://docs.google.com/spreadsheets/d/e/2PACX-1vQWGPCB4JTavq94EOgrNsO42T0YMwgAbz8-ZfDg9WgyK1BidHDhueGM6QtlITWPo_AyfT0pdDx-caO1/pubhtml?gid=0&single=true"
-          style="width:100%;height:75vh;border:none"
-          loading="lazy">
-        </iframe>
+
+      <!-- Liste des lots avec lien vers plan -->
+      <div class="card">
+        <div style="font-size:.85rem;font-weight:500;margin-bottom:10px">Lots — cliquez pour ouvrir le plan du parc</div>
+        <div id="plan-lots-list"><div class="loading">Chargement…</div></div>
       </div>
     </div>
 
@@ -1003,10 +1010,51 @@ window.exportExcel = ()=>{
   XLSX.writeFile(wb,'lots_huitres_'+todayStr()+'.xlsx');
 };
 
+// ─── PLAN SHEETS ───
+const PLAN_LINKS = {
+  'Locmariaquer': 'https://docs.google.com/spreadsheets/d/1fZSf0x9VgglfhACek6wTpMHq7GrNu8W9JYcrwLTVLzs/edit?usp=sharing',
+  // Ajoutez d'autres parcs ici
+};
+
+function renderPlanLots(){
+  const el = document.getElementById('plan-lots-list');
+  if(!el) return;
+  const arr = Object.entries(lots).sort((a,b)=>b[1].createdAt-a[1].createdAt);
+  if(!arr.length){el.innerHTML='<div class="empty">Aucun lot.</div>';return;}
+
+  // Grouper par lieu
+  const byLieu = {};
+  arr.forEach(([id,l])=>{
+    if(!byLieu[l.lieuActuel]) byLieu[l.lieuActuel]=[];
+    byLieu[l.lieuActuel].push([id,l]);
+  });
+
+  el.innerHTML = Object.entries(byLieu).map(([lieu, lots])=>{
+    const planUrl = PLAN_LINKS[lieu];
+    return `
+    <div style="margin-bottom:16px">
+      <div style="font-size:.8rem;font-weight:500;color:var(--text2);margin-bottom:6px;text-transform:uppercase;letter-spacing:.05em">${lieu}</div>
+      <div style="display:flex;flex-wrap:wrap;gap:6px">
+        ${lots.map(([id,l])=>{
+          const code = lotCode(l);
+          if(planUrl){
+            return `<a href="${planUrl}" target="_blank" style="text-decoration:none">
+              <div style="padding:6px 12px;border:1px solid var(--border);border-radius:8px;background:var(--surface);cursor:pointer;font-size:.82rem;font-weight:500;font-family:monospace;transition:all .15s;color:var(--text)" onmouseover="this.style.background='#e0f2fe';this.style.borderColor='var(--primary)'" onmouseout="this.style.background='var(--surface)';this.style.borderColor='var(--border)'">${code} <span style="font-size:.7rem;color:var(--primary)">↗</span></div>
+            </a>`;
+          } else {
+            return `<div style="padding:6px 12px;border:1px solid var(--border);border-radius:8px;background:var(--bg);font-size:.82rem;font-weight:500;font-family:monospace;color:var(--text2)">${code}</div>`;
+          }
+        }).join('')}
+      </div>
+    </div>`;
+  }).join('');
+}
+
 function renderAll(){
   renderStats();
   renderLots();
   renderExport();
+  renderPlanLots();
 }
 
 // ─── TABS ───
@@ -1018,10 +1066,6 @@ window.showTab = (name)=>{
   document.getElementById('tab-'+name)?.classList.add('active');
 };
 
-window.changerPlan = ()=>{
-  const url = document.getElementById('plan-select').value;
-  document.getElementById('plan-frame').src = url;
-};
 
 window.closeModal = (id)=>{
   document.getElementById(id).classList.remove('open');
