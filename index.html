@@ -230,11 +230,11 @@
   <div class="main">
     <div class="tabs">
       <button class="tab active" onclick="showTab('dashboard')">📊 Tableau de bord</button>
-      <button class="tab" onclick="showTab('lots')">📦 Lots</button>
       <button class="tab" onclick="showTab('nouveau')">➕ Nouveau lot</button>
+      <button class="tab" onclick="showTab('lots')">📦 Lots</button>
+      <button class="tab" onclick="showTab('plan')">🗺️ Plan des parcs</button>
       <button class="tab" onclick="showTab('export')">📥 Export</button>
       <button class="tab" id="tab-admin-btn" onclick="showTab('admin')" style="display:none">👤 Utilisateurs</button>
-      <button class="tab" onclick="showTab('plan')">🗺️ Plan des parcs</button>
     </div>
 
     <!-- DASHBOARD -->
@@ -309,9 +309,13 @@
       <div class="card" style="margin-bottom:12px">
         <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">
           <div style="font-size:.95rem;font-weight:500">🗺️ Plan des parcs</div>
-          <div style="display:flex;align-items:center;gap:8px">
+          <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
             <select id="plan-select" onchange="changerPlan()" style="padding:.4rem .7rem;border:1px solid var(--border);border-radius:8px;font-size:.82rem;background:var(--surface);color:var(--text)">
               <option value="https://docs.google.com/spreadsheets/d/1fZSf0x9VgglfhACek6wTpMHq7GrNu8W9JYcrwLTVLzs/htmlview?usp=sharing">Locmariaquer</option>
+              <option value="https://docs.google.com/spreadsheets/d/12GTFWaA_xT5IvdXyhCiQAxjPiacOssCvo7jhAbsDlxs/htmlview?usp=sharing">Carnac</option>
+            </select>
+            <select id="plan-lots-select" style="padding:.4rem .7rem;border:1px solid var(--border);border-radius:8px;font-size:.82rem;background:var(--surface);color:var(--text);min-width:160px">
+              <option value="">— Lots sur ce parc —</option>
             </select>
             <button class="btn-action" onclick="document.getElementById('plan-frame').src=document.getElementById('plan-frame').src" style="font-size:.8rem">🔄</button>
           </div>
@@ -320,7 +324,7 @@
       <div style="border:1px solid var(--border);border-radius:12px;overflow:hidden;background:var(--surface)">
         <iframe id="plan-frame"
           src="https://docs.google.com/spreadsheets/d/1fZSf0x9VgglfhACek6wTpMHq7GrNu8W9JYcrwLTVLzs/htmlview?usp=sharing"
-          style="width:100%;height:78vh;border:none"
+          style="width:100%;height:75vh;border:none"
           loading="lazy"
           sandbox="allow-scripts allow-same-origin allow-popups">
         </iframe>
@@ -1054,12 +1058,44 @@ function renderAll(){
 }
 
 // ─── TABS ───
+const PARC_URLS = {
+  'Locmariaquer': 'https://docs.google.com/spreadsheets/d/1fZSf0x9VgglfhACek6wTpMHq7GrNu8W9JYcrwLTVLzs/htmlview?usp=sharing',
+  'Carnac': 'https://docs.google.com/spreadsheets/d/12GTFWaA_xT5IvdXyhCiQAxjPiacOssCvo7jhAbsDlxs/htmlview?usp=sharing',
+};
+const URL_TO_LIEU = {
+  'https://docs.google.com/spreadsheets/d/1fZSf0x9VgglfhACek6wTpMHq7GrNu8W9JYcrwLTVLzs/htmlview?usp=sharing': 'Locmariaquer',
+  'https://docs.google.com/spreadsheets/d/12GTFWaA_xT5IvdXyhCiQAxjPiacOssCvo7jhAbsDlxs/htmlview?usp=sharing': 'Carnac',
+};
+
+window.changerPlan = ()=>{
+  const url = document.getElementById('plan-select').value;
+  document.getElementById('plan-frame').src = url;
+  updatePlanLotsList(url);
+};
+
+function updatePlanLotsList(url){
+  const lieu = URL_TO_LIEU[url]||'';
+  const sel = document.getElementById('plan-lots-select');
+  if(!sel) return;
+  const lotsIci = Object.entries(lots).filter(([id,l])=>!lieu||l.lieuActuel===lieu);
+  sel.innerHTML = lotsIci.length
+    ? '<option value="">— '+lieu+' : '+lotsIci.length+' lot(s) —</option>'
+      +lotsIci.map(([id,l])=>`<option value="${id}">${lotCode(l)}${l.origine?' · '+l.origine:''}${l.quantite?' · '+l.quantite+' dz':''}</option>`).join('')
+    : '<option value="">Aucun lot sur ce parc</option>';
+}
+
+function renderPlanLots(){
+  const url = document.getElementById('plan-select')?.value||'';
+  updatePlanLotsList(url);
+}
+
 window.showTab = (name)=>{
   document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
   document.querySelectorAll('.section').forEach(s=>s.classList.remove('active'));
-  const names=['dashboard','lots','nouveau','export','plan','admin'];
+  const names=['dashboard','nouveau','lots','plan','export','admin'];
   document.querySelectorAll('.tab')[names.indexOf(name)]?.classList.add('active');
   document.getElementById('tab-'+name)?.classList.add('active');
+  if(name==='plan') renderPlanLots();
 };
 
 
