@@ -307,27 +307,23 @@
     <!-- PLAN -->
     <div id="tab-plan" class="section">
       <div class="card" style="margin-bottom:12px">
-        <div style="font-size:.95rem;font-weight:500;margin-bottom:.5rem">🗺️ Plans des parcs</div>
-        <p style="font-size:.8rem;color:var(--text2)">Cliquez sur un lot pour ouvrir le plan du parc correspondant dans un nouvel onglet.</p>
-      </div>
-
-      <!-- Plans par lieu -->
-      <div class="card" style="margin-bottom:12px">
-        <div style="font-size:.85rem;font-weight:500;margin-bottom:10px">Accès rapide aux plans</div>
-        <div style="display:flex;flex-direction:column;gap:8px">
-          <a href="https://docs.google.com/spreadsheets/d/1fZSf0x9VgglfhACek6wTpMHq7GrNu8W9JYcrwLTVLzs/edit?usp=sharing" target="_blank" style="text-decoration:none">
-            <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 12px;border:1px solid var(--border);border-radius:8px;background:var(--surface);cursor:pointer;transition:border-color .15s" onmouseover="this.style.borderColor='var(--primary)'" onmouseout="this.style.borderColor='var(--border)'">
-              <div style="font-size:.85rem;font-weight:500">📋 Locmariaquer</div>
-              <div style="font-size:.75rem;color:var(--primary)">Ouvrir le plan →</div>
-            </div>
-          </a>
+        <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">
+          <div style="font-size:.95rem;font-weight:500">🗺️ Plan des parcs</div>
+          <div style="display:flex;align-items:center;gap:8px">
+            <select id="plan-select" onchange="changerPlan()" style="padding:.4rem .7rem;border:1px solid var(--border);border-radius:8px;font-size:.82rem;background:var(--surface);color:var(--text)">
+              <option value="https://docs.google.com/spreadsheets/d/1fZSf0x9VgglfhACek6wTpMHq7GrNu8W9JYcrwLTVLzs/htmlview?usp=sharing">Locmariaquer</option>
+            </select>
+            <button class="btn-action" onclick="document.getElementById('plan-frame').src=document.getElementById('plan-frame').src" style="font-size:.8rem">🔄</button>
+          </div>
         </div>
       </div>
-
-      <!-- Liste des lots avec lien vers plan -->
-      <div class="card">
-        <div style="font-size:.85rem;font-weight:500;margin-bottom:10px">Lots — cliquez pour ouvrir le plan du parc</div>
-        <div id="plan-lots-list"><div class="loading">Chargement…</div></div>
+      <div style="border:1px solid var(--border);border-radius:12px;overflow:hidden;background:var(--surface)">
+        <iframe id="plan-frame"
+          src="https://docs.google.com/spreadsheets/d/1fZSf0x9VgglfhACek6wTpMHq7GrNu8W9JYcrwLTVLzs/htmlview?usp=sharing"
+          style="width:100%;height:78vh;border:none"
+          loading="lazy"
+          sandbox="allow-scripts allow-same-origin allow-popups">
+        </iframe>
       </div>
     </div>
 
