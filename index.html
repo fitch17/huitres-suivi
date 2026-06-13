@@ -44,6 +44,7 @@
   .btn-sm{padding:.3rem .7rem;font-size:.8rem;border-radius:6px;cursor:pointer;border:1px solid var(--border);background:transparent;color:var(--text)}
   .btn-sm:hover{background:var(--bg)}
   .main{flex:1;padding:1.5rem;max-width:900px;margin:0 auto;width:100%}
+  #tab-plan{width:100vw;position:relative;left:50%;transform:translateX(-50%);padding:0 1.5rem;}
 
   /* TABS */
   .tabs{display:flex;gap:4px;border-bottom:1px solid var(--border);margin-bottom:1.5rem;overflow-x:auto}
@@ -321,13 +322,21 @@
           </div>
         </div>
       </div>
-      <div style="border:1px solid var(--border);border-radius:12px;overflow:hidden;background:var(--surface)">
+      <div style="position:fixed;top:0;left:0;right:0;bottom:0;z-index:10;background:var(--surface);display:none" id="plan-fullscreen">
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:.5rem 1rem;border-bottom:1px solid var(--border);background:var(--surface)">
+          <span style="font-size:.85rem;font-weight:500" id="plan-fullscreen-title">Plan</span>
+          <button class="btn-action" onclick="exitFullscreen()" style="font-size:.8rem">✕ Réduire</button>
+        </div>
+        <iframe id="plan-frame-full" style="width:100%;height:calc(100vh - 45px);border:none" sandbox="allow-scripts allow-same-origin allow-popups"></iframe>
+      </div>
+      <div style="border:1px solid var(--border);border-radius:12px;overflow:hidden;background:var(--surface);position:relative">
         <iframe id="plan-frame"
           src="https://docs.google.com/spreadsheets/d/1fZSf0x9VgglfhACek6wTpMHq7GrNu8W9JYcrwLTVLzs/htmlview?usp=sharing"
-          style="width:100%;height:75vh;border:none"
+          style="width:100%;height:82vh;border:none"
           loading="lazy"
           sandbox="allow-scripts allow-same-origin allow-popups">
         </iframe>
+        <button onclick="enterFullscreen()" style="position:absolute;bottom:12px;right:12px;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:6px 12px;font-size:.8rem;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,.1)">⛶ Plein écran</button>
       </div>
     </div>
 
@@ -762,6 +771,66 @@ window.saveOp = async (type)=>{
   setTimeout(()=>openLot(currentLotId),300);
 };
 
+window.deleteHistoEntry = async (lotId, key)=>{
+  if(!confirm('Supprimer cette entrée de l'historique ?')) return;
+  await remove(ref(db,'lots/'+lotId+'/historique/'+key));
+  setTimeout(()=>openLot(lotId), 300);
+};
+
+window.openEditLot = (id)=>{
+  const lot = lots[id];
+  if(!lot) return;
+  closeModal('overlay-lot');
+  document.getElementById('modal-op-title').textContent = 'Modifier le lot';
+  document.getElementById('modal-op-body').innerHTML = `
+    <div class="field-inline"><label>Numéro de lot</label>
+      <input type="text" id="edit-num" value="${lot.numero}">
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+      <div class="field-inline"><label>Année</label>
+        <input type="number" id="edit-annee" value="${lot.annee}">
+      </div>
+      <div class="field-inline"><label>Quantité (dz)</label>
+        <input type="number" id="edit-qte" value="${lot.quantite||''}">
+      </div>
+    </div>
+    <div class="field-inline"><label>Origine</label>
+      <input type="text" id="edit-origine" value="${lot.origine||''}">
+    </div>
+    <div class="field-inline"><label>Lieu actuel</label>
+      <select id="edit-lieu">
+        ${LIEUX.map(l=>`<option value="${l}" ${l===lot.lieuActuel?'selected':''}>${l}</option>`).join('')}
+      </select>
+    </div>
+    <div class="field-inline"><label>Date d'entrée</label>
+      <input type="date" id="edit-date" value="${lot.dateEntree||''}">
+    </div>
+    <div class="field-inline"><label>Notes</label>
+      <textarea id="edit-notes" rows="2">${lot.notes||''}</textarea>
+    </div>
+    <div style="display:flex;gap:8px;margin-top:4px">
+      <button class="btn-action primary" style="flex:1;justify-content:center" onclick="saveEditLot('${id}')">💾 Enregistrer</button>
+      <button class="btn-action" onclick="closeModal('overlay-op');openLot('${id}')">Annuler</button>
+    </div>
+  `;
+  document.getElementById('overlay-op').classList.add('open');
+};
+
+window.saveEditLot = async (id)=>{
+  const num    = document.getElementById('edit-num').value.trim();
+  const annee  = parseInt(document.getElementById('edit-annee').value)||new Date().getFullYear();
+  const qte    = parseInt(document.getElementById('edit-qte').value)||null;
+  const origine= document.getElementById('edit-origine').value.trim();
+  const lieu   = document.getElementById('edit-lieu').value;
+  const date   = document.getElementById('edit-date').value;
+  const notes  = document.getElementById('edit-notes').value.trim();
+  if(!num){alert('Numéro de lot requis.');return;}
+  await update(lotRef(id),{numero:num,annee,quantite:qte,origine,lieuActuel:lieu,dateEntree:date,notes});
+  closeModal('overlay-op');
+  setTimeout(()=>openLot(id),300);
+  alert('Lot mis à jour !');
+};
+
 window.deleteLot = async (id)=>{
   const lot = lots[id];
   if(!lot)return;
@@ -785,7 +854,7 @@ function todayStr(){return new Date().toISOString().split('T')[0];}
 
 function histoArr(lot){
   if(!lot.historique)return[];
-  return Object.values(lot.historique).sort((a,b)=>a.ts-b.ts);
+  return Object.entries(lot.historique).map(([k,v])=>({...v,_key:k})).sort((a,b)=>a.ts-b.ts);
 }
 
 function renderStats(){
@@ -973,13 +1042,20 @@ window.openLot = (id)=>{
       <div style="font-size:.82rem;font-weight:500;margin-bottom:8px;color:var(--text2)">Ajouter une opération</div>
       <div class="op-grid">${OPS.map(([op,ic])=>`<button class="op-btn" onclick="openOp('${op}')">${ic} ${op}</button>`).join('')}</div>
     </div>
-    <div style="font-size:.82rem;font-weight:500;margin-bottom:8px">Historique (${hist.length})</div>
-    <ul class="timeline">${hist.length?hist.map(h=>`
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+      <div style="font-size:.82rem;font-weight:500">Historique (${hist.length})</div>
+    </div>
+    <ul class="timeline">${hist.length?hist.map((h,i)=>`
       <li class="tl-item">
         <div class="tl-dot dot-${h.type}"></div><div class="tl-line"></div>
-        <div><div class="tl-title">${h.detail}</div><div class="tl-meta">${h.date}${h.lieu?' · '+h.lieu:''}</div></div>
+        <div style="flex:1">
+          <div class="tl-title">${h.detail}</div>
+          <div class="tl-meta">${h.date}${h.lieu?' · '+h.lieu:''}</div>
+        </div>
+        <button onclick="deleteHistoEntry('${id}','${h._key}')" title="Supprimer cette entrée" style="background:none;border:none;cursor:pointer;color:var(--text2);font-size:.8rem;padding:2px 4px;border-radius:4px;flex-shrink:0" onmouseover="this.style.color='var(--danger)'" onmouseout="this.style.color='var(--text2)'">✕</button>
       </li>`).join(''):'<div class="empty" style="padding:1rem">Aucune opération.</div>'}</ul>
-    <div style="margin-top:1rem;border-top:1px solid var(--border);padding-top:1rem">
+    <div style="margin-top:1rem;border-top:1px solid var(--border);padding-top:1rem;display:flex;gap:8px;flex-wrap:wrap">
+      <button class="btn-action" onclick="openEditLot('${id}')">✏️ Modifier le lot</button>
       <button class="btn-action danger" onclick="deleteLot('${id}')">🗑 Supprimer ce lot</button>
     </div>`;
   document.getElementById('overlay-lot').classList.add('open');
@@ -1030,6 +1106,11 @@ window.changerPlan = ()=>{
   const url = document.getElementById('plan-select').value;
   document.getElementById('plan-frame').src = url;
   updatePlanLotsList(url);
+  // Update fullscreen if open
+  const fs = document.getElementById('plan-fullscreen');
+  if(fs && fs.style.display!=='none'){
+    document.getElementById('plan-frame-full').src = url;
+  }
 };
 
 function updatePlanLotsList(url){
@@ -1047,6 +1128,20 @@ function renderPlanLots(){
   const url = document.getElementById('plan-select')?.value||'';
   updatePlanLotsList(url);
 }
+
+window.enterFullscreen = ()=>{
+  const url = document.getElementById('plan-frame').src;
+  const lieu = Object.entries(URL_TO_LIEU).find(([u])=>url.includes(u.split('/')[5]))?.[1]||'Plan';
+  document.getElementById('plan-fullscreen-title').textContent = '🗺️ ' + lieu;
+  document.getElementById('plan-frame-full').src = url;
+  document.getElementById('plan-fullscreen').style.display = 'block';
+  document.body.style.overflow = 'hidden';
+};
+window.exitFullscreen = ()=>{
+  document.getElementById('plan-fullscreen').style.display = 'none';
+  document.getElementById('plan-frame-full').src = '';
+  document.body.style.overflow = '';
+};
 
 window.showTab = (name)=>{
   document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
