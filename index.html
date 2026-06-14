@@ -955,9 +955,9 @@ window.searchLotInSheets = async ()=>{
         const idxMatch = cell.search(new RegExp('(^|[\\s\\-/|])' + lotNum.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i'));
         const idx = idxMatch >= 0 ? idxMatch : 0;
         const beforeLot = idx>0 ? cell.substring(0, idx) : cell;
-        // Grammage : soit Xg soit calibre K1/K2/K3/K4/K5/K4-K5/K4/K5
+        // Grammage : soit Xg soit calibre K1/K2/K3/K4/K5/K4-K5/K4/K5 soit En1/En2/En3/En4
         const gramMatch = beforeLot.match(/\b(\d+)\s*g\b/i);
-        const calibreMatch = !gramMatch ? beforeLot.match(/\b(K[1-5](?:[/-]K[1-5])?)\b/i) : null;
+        const calibreMatch = !gramMatch ? beforeLot.match(/\b(K[1-5](?:[/-]K[1-5])?|En[1-4])\b/i) : null;
         // Poids : nombre décimal suivi de kg après le numéro de lot
         const afterLot = idx>=0 ? cell.substring(idx) : cell;
         const poidsMatch = afterLot.match(/(\d+[,.]\d+|\d+)\s*kg/i);
