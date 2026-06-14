@@ -823,6 +823,98 @@ window.saveEditLot = async (id)=>{
   alert('Lot mis à jour !');
 };
 
+
+// ─── GOOGLE SHEETS API ───
+const SHEETS_API_KEY = 'AIzaSyC3uvsTue-0hlzKUYC9emPnOoCkIhA7N5s';
+const SHEET_IDS = {
+  'Locmariaquer': '1fZSf0x9VgglfhACek6wTpMHq7GrNu8W9JYcrwLTVLzs',
+  'Carnac': '12GTFWaA_xT5IvdXyhCiQAxjPiacOssCvo7jhAbsDlxs',
+};
+
+function parsePoches(cell, lotNum) {
+  // Cherche le numéro de lot dans la cellule (insensible à la casse)
+  if(!cell || !cell.toLowerCase().includes(lotNum.toLowerCase())) return null;
+  const result = { raw: cell, poches: null, grammage: null, poids: null, rangee: null };
+  // Extraire Xp (poches)
+  const pochesMatch = cell.match(/(\d+)\s*p\b/i);
+  if(pochesMatch) result.poches = pochesMatch[1] + 'p';
+  // Extraire Xg (grammage)
+  const gramMatch = cell.match(/(\d+)\s*g\b/i);
+  if(gramMatch) result.grammage = gramMatch[1] + 'g';
+  // Extraire X,Xkg ou X.Xkg (poids)
+  const poidsMatch = cell.match(/(\d+[,.]\d+|\d+)\s*kg/i);
+  if(poidsMatch) result.poids = poidsMatch[1].replace(',','.') + ' kg';
+  return result;
+}
+
+window.loadSheetsData = async (lotId, lotNum) => {
+  const el = document.getElementById('sheets-data-' + lotId);
+  if(!el) return;
+  el.innerHTML = '<div style="color:var(--text2);font-size:.8rem">🔄 Recherche en cours...</div>';
+  
+  const results = [];
+  
+  for(const [parc, sheetId] of Object.entries(SHEET_IDS)) {
+    try {
+      // Récupérer toutes les cellules de la feuille
+      const url = `https://sheets.googleapis.com/v4/spreadsheets/${sheetId}/values/A1:ZZ500?key=${SHEETS_API_KEY}`;
+      const resp = await fetch(url);
+      if(!resp.ok) continue;
+      const data = await resp.json();
+      const rows = data.values || [];
+      
+      // Chercher le numéro de lot dans toutes les cellules
+      rows.forEach((row, rowIdx) => {
+        row.forEach((cell, colIdx) => {
+          const parsed = parsePoches(cell, lotNum);
+          if(parsed) {
+            results.push({
+              parc,
+              rangee: rowIdx + 1,
+              colonne: String.fromCharCode(65 + colIdx),
+              ...parsed
+            });
+          }
+        });
+      });
+    } catch(e) {
+      console.error('Sheets API error for ' + parc, e);
+    }
+  }
+  
+  if(!results.length) {
+    el.innerHTML = '<div style="color:var(--text2);font-size:.8rem;padding:8px 0">Aucune occurrence trouvée dans les plans.</div>';
+    return;
+  }
+  
+  el.innerHTML = `
+    <div style="overflow-x:auto;margin-top:4px">
+      <table style="width:100%;border-collapse:collapse;font-size:.78rem">
+        <thead>
+          <tr style="background:var(--bg);border-bottom:1px solid var(--border)">
+            <th style="padding:6px 8px;text-align:left;font-weight:500">Parc</th>
+            <th style="padding:6px 8px;text-align:left;font-weight:500">Rangée</th>
+            <th style="padding:6px 8px;text-align:left;font-weight:500">Poches</th>
+            <th style="padding:6px 8px;text-align:left;font-weight:500">Grammage</th>
+            <th style="padding:6px 8px;text-align:left;font-weight:500">Poids/p</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${results.map(r=>`
+          <tr style="border-bottom:1px solid var(--border)">
+            <td style="padding:6px 8px"><span class="badge ${LIEU_BADGE[r.parc]||'b-gray'}">${r.parc}</span></td>
+            <td style="padding:6px 8px;color:var(--text2)">L${r.rangee}</td>
+            <td style="padding:6px 8px;font-weight:500">${r.poches||'—'}</td>
+            <td style="padding:6px 8px">${r.grammage||'—'}</td>
+            <td style="padding:6px 8px">${r.poids||'—'}</td>
+          </tr>`).join('')}
+        </tbody>
+      </table>
+    </div>
+    <div style="font-size:.72rem;color:var(--text2);margin-top:6px">${results.length} occurrence(s) trouvée(s)</div>
+  `;
+};
+
 window.deleteLot = async (id)=>{
   const lot = lots[id];
   if(!lot)return;
@@ -1046,6 +1138,12 @@ window.openLot = (id)=>{
         </div>
         <button onclick="deleteHistoEntry('${id}','${h._key}')" title="Supprimer cette entrée" style="background:none;border:none;cursor:pointer;color:var(--text2);font-size:.8rem;padding:2px 4px;border-radius:4px;flex-shrink:0" onmouseover="this.style.color='var(--danger)'" onmouseout="this.style.color='var(--text2)'">✕</button>
       </li>`).join(''):'<div class="empty" style="padding:1rem">Aucune opération.</div>'}</ul>
+    <div style="margin-top:1rem;border-top:1px solid var(--border);padding-top:1rem">
+      <div style="font-size:.82rem;font-weight:500;margin-bottom:8px">📊 Données des parcs</div>
+      <div id="sheets-data-${id}" style="font-size:.8rem;color:var(--text2)">
+        <button class="btn-action" onclick="loadSheetsData('${id}','${lot.numero}')" style="font-size:.8rem">🔍 Rechercher dans les plans</button>
+      </div>
+    </div>
     <div style="margin-top:1rem;border-top:1px solid var(--border);padding-top:1rem;display:flex;gap:8px;flex-wrap:wrap">
       <button class="btn-action" onclick="openEditLot('${id}')">✏️ Modifier le lot</button>
       <button class="btn-action danger" onclick="deleteLot('${id}')">🗑 Supprimer ce lot</button>
