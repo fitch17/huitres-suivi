@@ -322,21 +322,13 @@
           </div>
         </div>
       </div>
-      <div style="position:fixed;top:0;left:0;right:0;bottom:0;z-index:10;background:var(--surface);display:none" id="plan-fullscreen">
-        <div style="display:flex;align-items:center;justify-content:space-between;padding:.5rem 1rem;border-bottom:1px solid var(--border);background:var(--surface)">
-          <span style="font-size:.85rem;font-weight:500" id="plan-fullscreen-title">Plan</span>
-          <button class="btn-action" onclick="exitFullscreen()" style="font-size:.8rem">✕ Réduire</button>
-        </div>
-        <iframe id="plan-frame-full" style="width:100%;height:calc(100vh - 45px);border:none" sandbox="allow-scripts allow-same-origin allow-popups"></iframe>
-      </div>
-      <div style="border:1px solid var(--border);border-radius:12px;overflow:hidden;background:var(--surface);position:relative">
+      <div style="border:1px solid var(--border);border-radius:12px;overflow:hidden;background:var(--surface)">
         <iframe id="plan-frame"
           src="https://docs.google.com/spreadsheets/d/1fZSf0x9VgglfhACek6wTpMHq7GrNu8W9JYcrwLTVLzs/htmlview?usp=sharing"
           style="width:100%;height:82vh;border:none"
           loading="lazy"
           sandbox="allow-scripts allow-same-origin allow-popups">
         </iframe>
-        <button onclick="enterFullscreen()" style="position:absolute;bottom:12px;right:12px;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:6px 12px;font-size:.8rem;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,.1)">⛶ Plein écran</button>
       </div>
     </div>
 
@@ -1030,7 +1022,7 @@ window.openLot = (id)=>{
   if(!lot)return;
   document.getElementById('modal-lot-title').textContent='Lot '+lot.numero;
   const hist=histoArr(lot).reverse();
-  const OPS=[['Criblage','🔬'],['Calibrage','📏'],['Dédoublage','✂️'],['Au Tapis','🪣'],['Déplacement','📍'],['Remise à l\'eau','💧']];
+  const OPS=[['Criblage','🔬'],['Calibrage','📏'],['Dédoublage','✂️'],['Au Tapis','🪣'],['Déplacement','📍']];
   document.getElementById('modal-lot-body').innerHTML=`
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:1rem;font-size:.82rem">
       <div><span style="color:var(--text2)">Origine</span><br><strong>${lot.origine||'—'}</strong></div>
@@ -1106,11 +1098,7 @@ window.changerPlan = ()=>{
   const url = document.getElementById('plan-select').value;
   document.getElementById('plan-frame').src = url;
   updatePlanLotsList(url);
-  // Update fullscreen if open
-  const fs = document.getElementById('plan-fullscreen');
-  if(fs && fs.style.display!=='none'){
-    document.getElementById('plan-frame-full').src = url;
-  }
+
 };
 
 function updatePlanLotsList(url){
@@ -1128,20 +1116,6 @@ function renderPlanLots(){
   const url = document.getElementById('plan-select')?.value||'';
   updatePlanLotsList(url);
 }
-
-window.enterFullscreen = ()=>{
-  const url = document.getElementById('plan-frame').src;
-  const lieu = Object.entries(URL_TO_LIEU).find(([u])=>url.includes(u.split('/')[5]))?.[1]||'Plan';
-  document.getElementById('plan-fullscreen-title').textContent = '🗺️ ' + lieu;
-  document.getElementById('plan-frame-full').src = url;
-  document.getElementById('plan-fullscreen').style.display = 'block';
-  document.body.style.overflow = 'hidden';
-};
-window.exitFullscreen = ()=>{
-  document.getElementById('plan-fullscreen').style.display = 'none';
-  document.getElementById('plan-frame-full').src = '';
-  document.body.style.overflow = '';
-};
 
 window.showTab = (name)=>{
   document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
