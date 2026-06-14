@@ -942,16 +942,21 @@ window.searchLotInSheets = async ()=>{
     rows.forEach((row, rowIdx)=>{
       row.forEach((cell)=>{
         if(!cell||!cell.toLowerCase().includes(lotNum.toLowerCase())) return;
-        const pochesMatch = cell.match(/^\s*(\d+)\s*p\b/i);
+        // Poches : tous les nombres suivis de p dans la cellule (gère les cellules coupées type "18p12g 02S25")
+        let totalPoches = 0;
+        const allPochesMatches = cell.matchAll(/(\d+)\s*p\b/gi);
+        for(const m of allPochesMatches){ totalPoches += parseInt(m[1]); }
+        // Grammage : nombre suivi de g avant le numéro de lot
         const idx = cell.toLowerCase().indexOf(lotNum.toLowerCase());
-        const beforeLot = idx>0 ? cell.substring(0, idx) : '';
+        const beforeLot = idx>0 ? cell.substring(0, idx) : cell;
         const gramMatch = beforeLot.match(/\b(\d+)\s*g\b/i);
-        const afterLot = cell.substring(idx);
+        // Poids : nombre décimal suivi de kg après le numéro de lot
+        const afterLot = idx>=0 ? cell.substring(idx) : cell;
         const poidsMatch = afterLot.match(/(\d+[,.]\d+|\d+)\s*kg/i);
         found.push({
-          poches   : pochesMatch ? parseInt(pochesMatch[1]) : 0,
-          grammage : gramMatch   ? gramMatch[1]+'g' : '—',
-          poids    : poidsMatch  ? parseFloat(poidsMatch[1].replace(',','.')) : null,
+          poches   : totalPoches,
+          grammage : gramMatch  ? gramMatch[1]+'g' : '—',
+          poids    : poidsMatch ? parseFloat(poidsMatch[1].replace(',','.')) : null,
           raw      : cell,
           rangee   : rowIdx+1
         });
@@ -974,7 +979,7 @@ window.searchLotInSheets = async ()=>{
       grouped[key].rangees.push('L'+f.rangee);
     });
 
-    const rows_html = Object.values(grouped).sort((a,b)=>{
+    const rows_html = Object.values(grouped).filter(g=>g.poches>0).sort((a,b)=>{
       const ag=parseInt(a.grammage)||0, bg=parseInt(b.grammage)||0;
       return bg-ag;
     }).map(g=>`
@@ -982,7 +987,6 @@ window.searchLotInSheets = async ()=>{
         <td style="padding:7px 10px;font-weight:600">${g.poches}p</td>
         <td style="padding:7px 10px">${g.grammage}</td>
         <td style="padding:7px 10px">${g.poids?g.poids+' kg':'—'}</td>
-        <td style="padding:7px 10px;color:var(--text2);font-size:.75rem">${[...new Set(g.rangees)].join(', ')}</td>
       </tr>`).join('');
 
     const total = Object.values(grouped).reduce((s,g)=>s+g.poches,0);
@@ -996,14 +1000,13 @@ window.searchLotInSheets = async ()=>{
               <th style="padding:7px 10px;text-align:left;font-weight:500;border-bottom:1px solid var(--border)">Poches</th>
               <th style="padding:7px 10px;text-align:left;font-weight:500;border-bottom:1px solid var(--border)">Grammage</th>
               <th style="padding:7px 10px;text-align:left;font-weight:500;border-bottom:1px solid var(--border)">Poids/p</th>
-              <th style="padding:7px 10px;text-align:left;font-weight:500;border-bottom:1px solid var(--border)">Rangées</th>
             </tr>
           </thead>
           <tbody>${rows_html}</tbody>
           <tfoot>
             <tr style="background:var(--bg);border-top:2px solid var(--border)">
               <td style="padding:7px 10px;font-weight:700">${total}p</td>
-              <td colspan="3" style="padding:7px 10px;color:var(--text2);font-size:.75rem">Total</td>
+              <td colspan="2" style="padding:7px 10px;color:var(--text2);font-size:.75rem">Total</td>
             </tr>
           </tfoot>
         </table>
