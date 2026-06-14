@@ -941,13 +941,17 @@ window.searchLotInSheets = async ()=>{
     const found = [];
     rows.forEach((row, rowIdx)=>{
       row.forEach((cell)=>{
-        if(!cell||!cell.toLowerCase().includes(lotNum.toLowerCase())) return;
+        // Le numéro doit être précédé d'un séparateur ou être en début de cellule
+        // mais peut être suivi de lettres supplémentaires (ex: 02M24R, 02M24L)
+        const lotRegex = new RegExp('(^|[\\s\\-/|])' + lotNum.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
+        if(!cell||!lotRegex.test(cell)) return;
         // Poches : tous les nombres suivis de p dans la cellule (gère les cellules coupées type "18p12g 02S25")
         let totalPoches = 0;
         const allPochesMatches = cell.matchAll(/(\d+)\s*p\b/gi);
         for(const m of allPochesMatches){ totalPoches += parseInt(m[1]); }
         // Grammage : nombre suivi de g avant le numéro de lot
-        const idx = cell.toLowerCase().indexOf(lotNum.toLowerCase());
+        const idxMatch = cell.search(new RegExp('(^|[\\s\\-/|])' + lotNum.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i'));
+        const idx = idxMatch >= 0 ? idxMatch : 0;
         const beforeLot = idx>0 ? cell.substring(0, idx) : cell;
         const gramMatch = beforeLot.match(/\b(\d+)\s*g\b/i);
         // Poids : nombre décimal suivi de kg après le numéro de lot
