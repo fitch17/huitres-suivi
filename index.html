@@ -942,18 +942,19 @@ window.searchLotInSheets = async ()=>{
     rows.forEach((row, rowIdx)=>{
       row.forEach((cell)=>{
         if(!cell||!cell.toLowerCase().includes(lotNum.toLowerCase())) return;
-        const pochesMatch = cell.match(/(\d+)\s*p/i);
-        const gramMatch   = cell.match(/(\d+)\s*g/i);
-        const poidsMatch  = cell.match(/(\d+[,.]\d+|\d+)\s*kg/i);
+        const pochesMatch = cell.match(/^\s*(\d+)\s*p\b/i);
+        const idx = cell.toLowerCase().indexOf(lotNum.toLowerCase());
+        const beforeLot = idx>0 ? cell.substring(0, idx) : '';
+        const gramMatch = beforeLot.match(/\b(\d+)\s*g\b/i);
+        const afterLot = cell.substring(idx);
+        const poidsMatch = afterLot.match(/(\d+[,.]\d+|\d+)\s*kg/i);
         found.push({
-          poches : pochesMatch ? parseInt(pochesMatch[1]) : 0,
-          grammage: gramMatch  ? gramMatch[1]+'g' : '—',
-          poids  : poidsMatch  ? parseFloat(poidsMatch[1].replace(',','.')) : null,
-          raw    : cell,
-          rangee : rowIdx+1
-        });
-      });
-    });
+          poches   : pochesMatch ? parseInt(pochesMatch[1]) : 0,
+          grammage : gramMatch   ? gramMatch[1]+'g' : '—',
+          poids    : poidsMatch  ? parseFloat(poidsMatch[1].replace(',','.')) : null,
+          raw      : cell,
+          rangee   : rowIdx+1
+        });;
 
     if(!found.length){
       el.innerHTML='<div style="color:var(--text2);font-size:.8rem;padding:6px 0">Aucune occurrence trouvée pour <strong>'+lotNum+'</strong>.</div>';
