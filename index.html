@@ -941,9 +941,10 @@ window.searchLotInSheets = async ()=>{
     const found = [];
     rows.forEach((row, rowIdx)=>{
       row.forEach((cell)=>{
-        // Le numéro doit être précédé d'un séparateur ou être en début de cellule
-        // mais peut être suivi de lettres supplémentaires (ex: 02M24R, 02M24L)
-        const lotRegex = new RegExp('(^|[\\s\\-/|])' + lotNum.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
+        // Le numéro doit être précédé d'un séparateur ET suivi d'un séparateur, lettre optionnelle, ou fin
+        // 02M24 matche 02M24 et 02M24R mais PAS 02S25 ni 02M241
+        const escapedLot = lotNum.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        const lotRegex = new RegExp('(^|[\\s\\-/|])' + escapedLot + '([A-Za-z]{0,3})([\\s\\-/|,]|$)', 'i');
         if(!cell||!lotRegex.test(cell)) return;
         // Poches : tous les nombres suivis de p dans la cellule (gère les cellules coupées type "18p12g 02S25")
         let totalPoches = 0;
