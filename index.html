@@ -955,13 +955,15 @@ window.searchLotInSheets = async ()=>{
         const idxMatch = cell.search(new RegExp('(^|[\\s\\-/|])' + lotNum.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i'));
         const idx = idxMatch >= 0 ? idxMatch : 0;
         const beforeLot = idx>0 ? cell.substring(0, idx) : cell;
+        // Grammage : soit Xg soit calibre K1/K2/K3/K4/K5/K4-K5/K4/K5
         const gramMatch = beforeLot.match(/\b(\d+)\s*g\b/i);
+        const calibreMatch = !gramMatch ? beforeLot.match(/\b(K[1-5](?:[/-]K[1-5])?)\b/i) : null;
         // Poids : nombre décimal suivi de kg après le numéro de lot
         const afterLot = idx>=0 ? cell.substring(idx) : cell;
         const poidsMatch = afterLot.match(/(\d+[,.]\d+|\d+)\s*kg/i);
         found.push({
           poches   : totalPoches,
-          grammage : gramMatch  ? gramMatch[1]+'g' : '—',
+          grammage : gramMatch ? gramMatch[1]+'g' : (calibreMatch ? calibreMatch[1] : '—'),
           poids    : poidsMatch ? parseFloat(poidsMatch[1].replace(',','.')) : null,
           raw      : cell,
           rangee   : rowIdx+1
@@ -977,7 +979,7 @@ window.searchLotInSheets = async ()=>{
     // Regrouper par grammage + poids
     const grouped = {};
     found.forEach(f=>{
-      const key = f.grammage+'|'+(f.poids||'');
+      const key = f.grammage+'|'+(f.poids||'');  // grammage inclut déjà K1/K2/etc ou Xg
       if(!grouped[key]){
         grouped[key]={grammage:f.grammage, poids:f.poids, poches:0, rangees:[]};
       }
