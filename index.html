@@ -319,9 +319,10 @@
           </div>
         </div>
         <div style="border-top:1px solid var(--border);padding-top:10px;display:flex;align-items:center;gap:8px;flex-wrap:wrap">
-          <select id="plan-lot-search" style="padding:.4rem .7rem;border:1px solid var(--border);border-radius:8px;font-size:.82rem;background:var(--surface);color:var(--text);min-width:180px">
-            <option value="">— Sélectionner un lot —</option>
+          <select id="plan-lot-display" style="padding:.4rem .7rem;border:1px solid var(--border);border-radius:8px;font-size:.82rem;background:var(--surface);color:var(--text);min-width:180px">
+            <option value="">— Lots sur ce parc —</option>
           </select>
+          <input type="text" id="plan-lot-search" placeholder="Saisir le numéro exact du lot…" style="padding:.4rem .7rem;border:1px solid var(--border);border-radius:8px;font-size:.82rem;background:var(--surface);color:var(--text);min-width:160px;flex:1" onkeydown="if(event.key==='Enter')searchLotInSheets()">
           <button class="btn-action primary" onclick="searchLotInSheets()" style="font-size:.82rem">🔍 Voir les données</button>
           <button class="btn-action" onclick="document.getElementById('sheets-result').innerHTML='';document.getElementById('plan-lot-search').value=''" style="font-size:.82rem">✕</button>
         </div>
@@ -921,8 +922,8 @@ window.loadSheetsData = async (lotId, lotNum) => {
 };
 
 window.searchLotInSheets = async ()=>{
-  const lotNum = document.getElementById('plan-lot-search').value;
-  if(!lotNum){alert('Sélectionnez un lot.');return;}
+  const lotNum = document.getElementById('plan-lot-search').value.trim();
+  if(!lotNum){alert('Saisissez un numéro de lot.');return;}
   const planUrl = document.getElementById('plan-select').value;
   const lieu = URL_TO_LIEU[planUrl]||'';
   const sheetId = SHEET_IDS[lieu];
@@ -1305,10 +1306,13 @@ function updatePlanLotsList(url){
   const sel = document.getElementById('plan-lot-search');
   if(!sel) return;
   const lotsIci = Object.entries(lots).filter(([id,l])=>!lieu||l.lieuActuel===lieu);
-  sel.innerHTML = lotsIci.length
-    ? '<option value="">— Sélectionner un lot ('+lieu+') —</option>'
-      +lotsIci.map(([id,l])=>`<option value="${l.numero}">${lotCode(l)}${l.origine?' · '+l.origine:''}</option>`).join('')
-    : '<option value="">Aucun lot sur ce parc</option>';
+  const displaySel = document.getElementById('plan-lot-display');
+  if(displaySel){
+    displaySel.innerHTML = lotsIci.length
+      ? '<option value="">— Lots sur ce parc ('+lotsIci.length+') —</option>'
+        +lotsIci.map(([id,l])=>`<option value="${l.numero}">${lotCode(l)} · ${l.origine||''}</option>`).join('')
+      : '<option value="">Aucun lot sur ce parc</option>';
+  }
   document.getElementById('sheets-result').innerHTML='';
 }
 
