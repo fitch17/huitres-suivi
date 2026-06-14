@@ -308,19 +308,24 @@
     <!-- PLAN -->
     <div id="tab-plan" class="section">
       <div class="card" style="margin-bottom:12px">
-        <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">
+        <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:10px">
           <div style="font-size:.95rem;font-weight:500">🗺️ Plan des parcs</div>
           <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
             <select id="plan-select" onchange="changerPlan()" style="padding:.4rem .7rem;border:1px solid var(--border);border-radius:8px;font-size:.82rem;background:var(--surface);color:var(--text)">
               <option value="https://docs.google.com/spreadsheets/d/1fZSf0x9VgglfhACek6wTpMHq7GrNu8W9JYcrwLTVLzs/htmlview?usp=sharing">Locmariaquer</option>
               <option value="https://docs.google.com/spreadsheets/d/12GTFWaA_xT5IvdXyhCiQAxjPiacOssCvo7jhAbsDlxs/htmlview?usp=sharing">Carnac</option>
             </select>
-            <select id="plan-lots-select" style="padding:.4rem .7rem;border:1px solid var(--border);border-radius:8px;font-size:.82rem;background:var(--surface);color:var(--text);min-width:160px">
-              <option value="">— Lots sur ce parc —</option>
-            </select>
             <button class="btn-action" onclick="document.getElementById('plan-frame').src=document.getElementById('plan-frame').src" style="font-size:.8rem">🔄</button>
           </div>
         </div>
+        <div style="border-top:1px solid var(--border);padding-top:10px;display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+          <select id="plan-lot-search" style="padding:.4rem .7rem;border:1px solid var(--border);border-radius:8px;font-size:.82rem;background:var(--surface);color:var(--text);min-width:180px">
+            <option value="">— Sélectionner un lot —</option>
+          </select>
+          <button class="btn-action primary" onclick="searchLotInSheets()" style="font-size:.82rem">🔍 Voir les données</button>
+          <button class="btn-action" onclick="document.getElementById('sheets-result').innerHTML='';document.getElementById('plan-lot-search').value=''" style="font-size:.82rem">✕</button>
+        </div>
+        <div id="sheets-result" style="margin-top:10px"></div>
       </div>
       <div style="border:1px solid var(--border);border-radius:12px;overflow:hidden;background:var(--surface)">
         <iframe id="plan-frame"
@@ -915,6 +920,96 @@ window.loadSheetsData = async (lotId, lotNum) => {
   `;
 };
 
+window.searchLotInSheets = async ()=>{
+  const lotNum = document.getElementById('plan-lot-search').value;
+  if(!lotNum){alert('Sélectionnez un lot.');return;}
+  const planUrl = document.getElementById('plan-select').value;
+  const lieu = URL_TO_LIEU[planUrl]||'';
+  const sheetId = SHEET_IDS[lieu];
+  if(!sheetId){alert('Aucune sheet configurée pour ce parc.');return;}
+
+  const el = document.getElementById('sheets-result');
+  el.innerHTML = '<div style="color:var(--text2);font-size:.8rem;padding:6px 0">🔄 Recherche en cours...</div>';
+
+  try{
+    const url = `https://sheets.googleapis.com/v4/spreadsheets/${sheetId}/values/A1:ZZ500?key=${SHEETS_API_KEY}`;
+    const resp = await fetch(url);
+    if(!resp.ok) throw new Error('API error '+resp.status);
+    const data = await resp.json();
+    const rows = data.values||[];
+
+    const found = [];
+    rows.forEach((row, rowIdx)=>{
+      row.forEach((cell)=>{
+        if(!cell||!cell.toLowerCase().includes(lotNum.toLowerCase())) return;
+        const pochesMatch = cell.match(/(\d+)\s*p/i);
+        const gramMatch   = cell.match(/(\d+)\s*g/i);
+        const poidsMatch  = cell.match(/(\d+[,.]\d+|\d+)\s*kg/i);
+        found.push({
+          poches : pochesMatch ? parseInt(pochesMatch[1]) : 0,
+          grammage: gramMatch  ? gramMatch[1]+'g' : '—',
+          poids  : poidsMatch  ? parseFloat(poidsMatch[1].replace(',','.')) : null,
+          raw    : cell,
+          rangee : rowIdx+1
+        });
+      });
+    });
+
+    if(!found.length){
+      el.innerHTML='<div style="color:var(--text2);font-size:.8rem;padding:6px 0">Aucune occurrence trouvée pour <strong>'+lotNum+'</strong>.</div>';
+      return;
+    }
+
+    // Regrouper par grammage + poids
+    const grouped = {};
+    found.forEach(f=>{
+      const key = f.grammage+'|'+(f.poids||'');
+      if(!grouped[key]){
+        grouped[key]={grammage:f.grammage, poids:f.poids, poches:0, rangees:[]};
+      }
+      grouped[key].poches += f.poches;
+      grouped[key].rangees.push('L'+f.rangee);
+    });
+
+    const rows_html = Object.values(grouped).sort((a,b)=>{
+      const ag=parseInt(a.grammage)||0, bg=parseInt(b.grammage)||0;
+      return bg-ag;
+    }).map(g=>`
+      <tr style="border-bottom:1px solid var(--border)">
+        <td style="padding:7px 10px;font-weight:600">${g.poches}p</td>
+        <td style="padding:7px 10px">${g.grammage}</td>
+        <td style="padding:7px 10px">${g.poids?g.poids+' kg':'—'}</td>
+        <td style="padding:7px 10px;color:var(--text2);font-size:.75rem">${[...new Set(g.rangees)].join(', ')}</td>
+      </tr>`).join('');
+
+    const total = Object.values(grouped).reduce((s,g)=>s+g.poches,0);
+
+    el.innerHTML = `
+      <div style="font-size:.82rem;font-weight:500;margin-bottom:8px">Résultats pour <span style="font-family:monospace">${lotNum}</span> — ${lieu}</div>
+      <div style="overflow-x:auto;border-radius:8px;border:1px solid var(--border)">
+        <table style="width:100%;border-collapse:collapse;font-size:.82rem">
+          <thead>
+            <tr style="background:var(--bg)">
+              <th style="padding:7px 10px;text-align:left;font-weight:500;border-bottom:1px solid var(--border)">Poches</th>
+              <th style="padding:7px 10px;text-align:left;font-weight:500;border-bottom:1px solid var(--border)">Grammage</th>
+              <th style="padding:7px 10px;text-align:left;font-weight:500;border-bottom:1px solid var(--border)">Poids/p</th>
+              <th style="padding:7px 10px;text-align:left;font-weight:500;border-bottom:1px solid var(--border)">Rangées</th>
+            </tr>
+          </thead>
+          <tbody>${rows_html}</tbody>
+          <tfoot>
+            <tr style="background:var(--bg);border-top:2px solid var(--border)">
+              <td style="padding:7px 10px;font-weight:700">${total}p</td>
+              <td colspan="3" style="padding:7px 10px;color:var(--text2);font-size:.75rem">Total</td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>`;
+  }catch(e){
+    el.innerHTML='<div style="color:var(--danger);font-size:.8rem;padding:6px 0">Erreur : '+e.message+'</div>';
+  }
+};
+
 window.deleteLot = async (id)=>{
   const lot = lots[id];
   if(!lot)return;
@@ -1138,12 +1233,6 @@ window.openLot = (id)=>{
         </div>
         <button onclick="deleteHistoEntry('${id}','${h._key}')" title="Supprimer cette entrée" style="background:none;border:none;cursor:pointer;color:var(--text2);font-size:.8rem;padding:2px 4px;border-radius:4px;flex-shrink:0" onmouseover="this.style.color='var(--danger)'" onmouseout="this.style.color='var(--text2)'">✕</button>
       </li>`).join(''):'<div class="empty" style="padding:1rem">Aucune opération.</div>'}</ul>
-    <div style="margin-top:1rem;border-top:1px solid var(--border);padding-top:1rem">
-      <div style="font-size:.82rem;font-weight:500;margin-bottom:8px">📊 Données des parcs</div>
-      <div id="sheets-data-${id}" style="font-size:.8rem;color:var(--text2)">
-        <button class="btn-action" onclick="loadSheetsData('${id}','${lot.numero}')" style="font-size:.8rem">🔍 Rechercher dans les plans</button>
-      </div>
-    </div>
     <div style="margin-top:1rem;border-top:1px solid var(--border);padding-top:1rem;display:flex;gap:8px;flex-wrap:wrap">
       <button class="btn-action" onclick="openEditLot('${id}')">✏️ Modifier le lot</button>
       <button class="btn-action danger" onclick="deleteLot('${id}')">🗑 Supprimer ce lot</button>
@@ -1201,13 +1290,15 @@ window.changerPlan = ()=>{
 
 function updatePlanLotsList(url){
   const lieu = URL_TO_LIEU[url]||'';
-  const sel = document.getElementById('plan-lots-select');
+  // Alimenter le select de recherche par lot
+  const sel = document.getElementById('plan-lot-search');
   if(!sel) return;
   const lotsIci = Object.entries(lots).filter(([id,l])=>!lieu||l.lieuActuel===lieu);
   sel.innerHTML = lotsIci.length
-    ? '<option value="">— '+lieu+' : '+lotsIci.length+' lot(s) —</option>'
-      +lotsIci.map(([id,l])=>`<option value="${id}">${lotCode(l)}${l.origine?' · '+l.origine:''}${l.quantite?' · '+l.quantite+' dz':''}</option>`).join('')
+    ? '<option value="">— Sélectionner un lot ('+lieu+') —</option>'
+      +lotsIci.map(([id,l])=>`<option value="${l.numero}">${lotCode(l)}${l.origine?' · '+l.origine:''}</option>`).join('')
     : '<option value="">Aucun lot sur ce parc</option>';
+  document.getElementById('sheets-result').innerHTML='';
 }
 
 function renderPlanLots(){
