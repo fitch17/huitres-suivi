@@ -772,7 +772,7 @@ window.saveOp = async (type)=>{
 };
 
 window.deleteHistoEntry = async (lotId, key)=>{
-  if(!confirm('Supprimer cette entrée de l'historique ?')) return;
+  if(!confirm('Supprimer cette entrée de l\'historique ?')) return;
   await remove(ref(db,'lots/'+lotId+'/historique/'+key));
   setTimeout(()=>openLot(lotId), 300);
 };
